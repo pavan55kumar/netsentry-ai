@@ -197,16 +197,20 @@ def train_and_evaluate_models(
             is_tuned = False
             tune_summary = {}
             # Evaluate CV macro-F1 strictly on training data
-            scores = cross_val_score(
-                pipe,
-                prepared.X_train,
-                prepared.y_train,
-                cv=cv,
-                scoring="f1_macro",
-                n_jobs=-1,
-            )
-            cv_mean = float(scores.mean())
-            cv_std = float(scores.std())
+            try:
+                scores = cross_val_score(
+                    pipe,
+                    prepared.X_train,
+                    prepared.y_train,
+                    cv=cv,
+                    scoring="f1_macro",
+                    n_jobs=-1,
+                )
+                cv_mean = float(scores.mean())
+                cv_std = float(scores.std())
+            except Exception:
+                cv_mean = 0.0
+                cv_std = 0.0
 
             start_fit = time.perf_counter()
             pipe.fit(prepared.X_train, prepared.y_train)

@@ -163,7 +163,7 @@ def build_pipeline(model_key: str, random_state: int = 42, fast_mode: bool = Fal
         return Pipeline([
             ("imputer", SimpleImputer(strategy="median")),
             ("scaler", StandardScaler()),
-            ("model", CalibratedClassifierCV(estimator=base_svc, cv=3)),
+            ("model", CalibratedClassifierCV(estimator=base_svc, cv=2)),
         ])
 
     elif model_key == "mlp_neural_network":

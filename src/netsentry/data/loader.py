@@ -80,9 +80,9 @@ def load_csv(path: str | Path, nrows: int | None = None) -> pd.DataFrame:
 def detect_schema_family(columns: list[str]) -> str:
     """Identify if the dataset belongs to a known benchmark schema."""
     cols_lower = {c.lower() for c in columns}
-    if {"destination port", "flow duration", "total fwd packets"}.issubset(cols_lower):
+    if ({"flow duration", "total fwd packets"}.issubset(cols_lower) or "flow bytes/s" in cols_lower) and "dur" not in cols_lower:
         return "CIC-IDS2017"
-    if {"dur", "proto", "service", "state", "spkts"}.issubset(cols_lower):
+    if {"dur", "spkts"}.issubset(cols_lower) or "attack_cat" in cols_lower:
         return "UNSW-NB15"
     if {"flow_duration_ms", "total_fwd_packets", "flow_bytes_per_second"}.issubset(cols_lower):
         return "NetSentry-Demo"

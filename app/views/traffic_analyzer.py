@@ -3,19 +3,28 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import tempfile
 import joblib
 import pandas as pd
 import streamlit as st
 
-from src.netsentry.predict import score_flows
-from src.netsentry.explainability.local_explainer import explain_single_flow
-from src.netsentry.explainability.narrative import generate_security_narrative
+try:
+    from netsentry.predict import score_flows
+    from netsentry.explainability.local_explainer import explain_single_flow
+    from netsentry.explainability.narrative import generate_security_narrative
+    from netsentry.pcap.flow_extractor import extract_flows_from_pcap
+except ImportError:
+    from src.netsentry.predict import score_flows
+    from src.netsentry.explainability.local_explainer import explain_single_flow
+    from src.netsentry.explainability.narrative import generate_security_narrative
+    from src.netsentry.pcap.flow_extractor import extract_flows_from_pcap
+
 from ..styles import render_badge, render_kpi
 
 
 def render_traffic_analyzer_view():
     st.markdown("## 🛰️ Live Traffic Analyzer & Flow Scoring")
-    st.caption("Score incoming network connection flows, filter suspicious traffic, inspect threat telemetry, and export security audits.")
+    st.caption("Score incoming network connection flows, ingest raw PCAP captures, filter suspicious traffic, and export security audits.")
 
     model_path = Path("artifacts/best_model.joblib")
     features_path = Path("artifacts/feature_names.json")
@@ -36,14 +45,53 @@ def render_traffic_analyzer_view():
     with col_src:
         traffic_source = st.radio(
             "Select Flow Ingestion Stream",
-            ["Curated Sample Flow Traffic (data/sample/demo_flows.csv)", "Upload Unlabeled Flow CSV"],
+            [
+                "Curated Sample Flow Traffic (data/sample/demo_flows.csv)",
+                "Upload Unlabeled Flow CSV",
+                "Offline Packet Capture (PCAP/PCAPNG Ingestion)",
+            ],
             horizontal=True,
         )
     with col_thresh:
         thresh = st.slider("Alert Threshold", min_value=0.1, max_value=0.9, value=0.5, step=0.05)
 
     input_df: pd.DataFrame | None = None
-    if "Upload" in traffic_source:
+    pcap_meta: dict | None = None
+
+    if "PCAP" in traffic_source:
+        st.info("🔒 **Ethical Notice:** Offline PCAP ingestion allows safe analysis of pre-recorded captures without live wire interception. Ensure explicit authorization before analyzing network traces.")
+        pcap_option = st.radio("PCAP Source", ["Included Sample Capture (data/sample/test_traffic.pcap)", "Upload Custom .pcap/.pcapng File"], horizontal=True)
+        
+        target_pcap_path = None
+        if "Included" in pcap_option:
+            pcap_file = Path("data/sample/test_traffic.pcap")
+            if pcap_file.is_file():
+                target_pcap_path = pcap_file
+            else:
+                st.warning("Sample PCAP not found in data/sample/test_traffic.pcap")
+        else:
+            pcap_upload = st.file_uploader("Upload raw packet capture", type=["pcap", "pcapng"], key="pcap_uploader")
+            if pcap_upload is not None:
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pcap")
+                tmp.write(pcap_upload.read())
+                tmp.flush()
+                target_pcap_path = Path(tmp.name)
+
+        if target_pcap_path is not None:
+            with st.spinner("Parsing raw packets and reconstructing bidirectional 5-tuple flows..."):
+                try:
+                    pcap_result = extract_flows_from_pcap(target_pcap_path)
+                    input_df = pcap_result.flow_dataframe
+                    pcap_meta = pcap_result.to_dict()
+                    
+                    st.success(f"Reconstructed {pcap_result.total_flows_extracted} flows from {pcap_result.total_packets_read} packets ({pcap_result.capture_duration_sec:.2f}s capture duration).")
+                    with st.expander("🔍 Inspect PCAP Extraction Summary & 5-Tuple Details"):
+                        st.json(pcap_meta)
+                except Exception as ex:
+                    st.error(f"Error parsing PCAP capture: {ex}")
+                    return
+
+    elif "Upload" in traffic_source:
         uploaded = st.file_uploader("Upload CSV containing flow records", type=["csv"], key="analyzer_upload")
         if uploaded is not None:
             input_df = pd.read_csv(uploaded, low_memory=False)
@@ -61,7 +109,18 @@ def render_traffic_analyzer_view():
     # Check required features
     missing_feats = [f for f in features if f not in input_df.columns]
     if missing_feats:
-        st.error(f"Input data is missing {len(missing_feats)} features required by the active model: {missing_feats[:5]}")
+        st.error(
+            f"⚠️ **Schema Incompatibility:** The active champion model expects {len(features)} features ({features[:5]}...), "
+            f"but the current input provides {len(input_df.columns)} columns. "
+            f"Missing features: {missing_feats[:6]}."
+        )
+        st.markdown(
+            "> [!NOTE]\n"
+            "> If you extracted flows from PCAP or uploaded a dataset from a different schema family (e.g. NetSentry 8-feature schema vs CIC-IDS2017 77-feature schema), "
+            "> please select or train a matching model in the **Model Lab**."
+        )
+        with st.expander("📋 View Extracted / Raw Flow Table"):
+            st.dataframe(input_df.head(100), use_container_width=True)
         return
 
     # Score flows
