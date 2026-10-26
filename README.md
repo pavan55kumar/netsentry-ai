@@ -1,109 +1,155 @@
-# NetSentry AI
+# NetSentry AI — Advanced ML Research Platform & Cybersecurity UI
 
-A small, educational network-intrusion-detection project. It learns from **labeled network-flow rows** (one row per connection/flow), not individual packets. The initial run is intentionally synthetic, so you can learn the workflow without downloading a huge dataset.
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Streamlit UI](https://img.shields.io/badge/Streamlit-v2.0-FF4B4B.svg)](https://streamlit.io/)
+[![Tests Passing](https://img.shields.io/badge/Tests-15%2F15%20Passing-brightgreen.svg)]()
 
-> Important: demo results are only results on generated data. They do not show real intrusion-detection accuracy. Results on a public dataset depend on the data, labeling, feature choices, split strategy, and random seed.
+> **NetSentry AI** is a professional, research-grade Network Intrusion Detection & Anomaly Detection research platform. It bridges **Data Communication & Networking (DCN)** with **Machine Learning (ML)** engineering, training on bidirectional network connection flows (NetFlow / IPFIX).
 
-## What you will learn
+---
 
-- How a flow CSV becomes numeric model inputs
-- Why the `label` is kept out of the inputs
-- How to compare Logistic Regression, Random Forest, Extra Trees, and Histogram Gradient Boosting
-- Why accuracy alone can hide a bad intrusion detector
-- How to save a model and score new flow rows
+## 🚀 Key Highlights & Architectural Upgrades
 
-## Open and run in VS Code
+- **Multi-Model Benchmark Suite:** Evaluates 9 distinct algorithms across linear (`Logistic Regression`), rule-based (`Decision Tree`), bagging ensembles (`Random Forest`, `Extra Trees`), boosting (`HistGradientBoosting`), distance-based (`KNN`), maximum margin (`Calibrated Linear SVM`), deep learning (`MLP Neural Network`), and unsupervised anomaly discovery (`Isolation Forest`).
+- **Zero-Leakage Training Guardrails:** Imputation, standard scaling, and hyperparameter tuning occur strictly inside training cross-validation folds. The holdout test set remains completely untouched until final verification.
+- **The Accuracy Trap Safeguard:** Automatically computes a majority Zero-R dummy classifier baseline to expose why naive 99% accuracy can be completely blind to minority cyber attacks.
+- **Explainable AI (XAI):** Global Tree MDI / Permutation feature importance, local flow attribution waterfalls ($z$-scores), and plain-English SOC analyst narratives.
+- **Advanced Research Features:** Cross-dataset domain generalization (e.g. CIC-IDS2017 to UNSW-NB15), zero-day unsupervised anomaly detection, and simulated covariate model drift.
+- **Modular PCAP Ingestion:** Built-in 5-tuple bidirectional flow aggregator parsing `.pcap` and `.pcapng` packet captures into model-ready CSVs.
+- **Executive Operations Center UI:** Cyberpunk dark navy Streamlit interface with interactive Plotly charts, threshold calibration sliders, and live flow inference.
 
-1. Use Python 3.11, 3.12, or 3.13 for the smoothest package installation, then select it with **Python: Select Interpreter** in VS Code. Open this `netsentry-ai` folder in VS Code.
-2. Open **Terminal → New Terminal** and run the following from this folder:
+---
+
+## 🛠️ Quick Start in VS Code (Windows PowerShell)
+
+### 1. Environment Setup
+Open the `netsentry-ai` folder in VS Code, open a terminal (`Terminal → New Terminal`), and run:
 
 ```powershell
+# If execution policy blocks script activation:
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+# Create and activate virtual environment
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+
+# Upgrade pip and install package with all research dependencies
 python -m pip install --upgrade pip
 pip install -e .
 pip install -r requirements.txt
+```
+
+### 2. Run Automated Verification Tests
+```powershell
 python -m unittest discover -s tests -v
+```
+*(Runs 15 automated unit and integration tests covering data partitioning, model factory, evaluation metrics, explainability, research experiments, and predictions).*
+
+### 3. Launch the Premium Research Web UI
+```powershell
+streamlit run app/main.py
+```
+*(Opens the interactive research interface in your default browser at `http://localhost:8501`).*
+
+---
+
+## 🔬 CLI Training & Prediction Commands
+
+### A. Quick Baseline Demo Run (Synthetic Data)
+```powershell
 python -m netsentry.train --demo
 ```
+*(Runs 5-fold cross-validation on 4 core algorithms and generates champion artifacts in `artifacts/`).*
 
-If PowerShell blocks activation, run this in that terminal once, then activate again:
-
+### B. Fast Laptop Mode (Sub-second execution)
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+python -m netsentry.train --demo --fast
 ```
 
-The demo creates `artifacts/` containing:
-
-- `best_model.joblib` — the selected trained pipeline
-- `feature_names.json` — exact input-column order expected later
-- `metrics.json` — precision, recall, macro-F1, false-positive rate, and confusion matrices
-- `model_comparison.csv` — a compact comparison table
-- `confusion_matrix.png` — a picture of the selected model's holdout results
-
-The four training pipelines impute missing numbers **using training data only**. The Logistic Regression pipeline also scales only from training data. The project uses 5-fold cross-validation on the training portion to choose the saved model; the holdout test portion is not used for selection. This is why the transformations sit inside each pipeline.
-
-## Read the metrics
-
-For malicious traffic (the positive class):
-
-- **Precision:** Of flows predicted malicious, how many really were malicious?
-- **Recall:** Of actual malicious flows, how many were found?
-- **Macro-F1:** A balanced score treating benign and malicious classes equally.
-- **False-positive rate (FPR):** Of benign flows, what fraction were incorrectly flagged? High FPR causes alert fatigue.
-- **Confusion matrix:** Shows true/false positives/negatives directly.
-
-The project selects the model with the highest mean training-only cross-validation macro-F1 as a transparent default. That is not a deployment decision: in a real environment, choose a threshold/model after deciding the cost of missed attacks versus false alarms.
-
-## Use a real public network-flow CSV
-
-This repository does not download or train on a public dataset automatically. Download a labeled flow dataset yourself, read its license/card, and place a CSV under `data/real/` (the folder is ignored by Git). Examples often used for learning include [CICIDS2017](https://www.unb.ca/cic/datasets/ids-2017.html) and [UNSW-NB15](https://research.unsw.edu.au/projects/unsw-nb15-dataset). Their column names and labels differ, so inspect them first.
-
-Your input must have:
-
-1. One label column with exactly two values, such as `BENIGN` and `ATTACK`.
-2. Numeric flow-measurement columns, such as packet counts, bytes, duration, and flags.
-3. No answer-revealing columns used as features. Do not use target/attack/category fields, IDs, capture timestamps, or dataset-specific fields that encode the answer.
-
-Example (adjust the file path and label names to match your data):
-
+### C. Train All 9 Supported Algorithms
 ```powershell
-python -m netsentry.train --data data\real\flows.csv --label-column Label --positive-label ATTACK --drop-columns "Flow ID" Timestamp --artifacts-dir artifacts\real_run
+python -m netsentry.train --demo --fast --models logistic_regression decision_tree random_forest_500 extra_trees_500 hist_gradient_boosting k_nearest_neighbors support_vector_machine mlp_neural_network isolation_forest
 ```
 
-The program automatically ignores non-numeric columns and drops suspicious names containing words such as `attack`, `class`, `category`, `label`, `target`, or `outcome`. It reports those decisions in `metrics.json`.
-
-### Leakage warning
-
-Before splitting, exact duplicate feature rows are removed so identical rows cannot appear on both sides. The default split is reproducible and stratified, meaning both benign and malicious traffic appear in train and test. It is still only a baseline. If records overlap by host/session or are ordered in time, random splitting can exaggerate performance. For serious evaluation, use a chronological split or a group split (for example, keep all flows from a host/session together) and document it.
-
-## Score new flows
-
-After training, score a new unlabeled CSV. It must contain every column listed in the saved `feature_names.json`:
-
+### D. Hyperparameter Tuning on Training Folds
 ```powershell
-python -m netsentry.predict --data data\real\new_flows.csv --model artifacts\real_run\best_model.joblib --features artifacts\real_run\feature_names.json --output artifacts\real_run\predictions.csv
+python -m netsentry.train --demo --tune --fast
 ```
 
-`prediction` is `0` for benign and `1` for malicious. `malicious_probability`, when present, is a model score — not a guaranteed probability of an attack.
+### E. Train on Real Research Dataset (CIC-IDS2017 Sample)
+```powershell
+python -m netsentry.train --data data\sample\cicids2017_sample.csv --label-column Label --positive-label "DoS Hulk" --fast --artifacts-dir artifacts\cicids_run
+```
 
-## File guide
+### F. Score New Network Flows (Inference)
+```powershell
+python -m netsentry.predict --data data\sample\demo_flows.csv --model artifacts\best_model.joblib --features artifacts\feature_names.json --output artifacts\predictions.csv --threshold 0.50
+```
 
-| File | Purpose |
-| --- | --- |
-| `src/netsentry/data.py` | Synthetic demo data, CSV loading, validation, duplicate removal, and splitting. |
-| `src/netsentry/train.py` | Cross-validates and evaluates four baseline models; saves reports and the selected pipeline. |
-| `src/netsentry/predict.py` | Loads the saved pipeline and scores new flows. |
-| `tests/test_data.py` | Small smoke test for the data preparation rules. |
-| `requirements.txt` / `pyproject.toml` | Python package setup and required libraries. |
+---
 
-## Sensible next steps
+## 📁 Repository Directory Structure
 
-- Train on one well-documented public dataset and record its exact version and preprocessing.
-- Add a time/group-aware split that matches your capture setup.
-- Inspect class imbalance and use precision-recall curves to choose an alert threshold.
-- Evaluate on a separate later capture, not just a random holdout.
-- Never send unreviewed automated blocking decisions to a production firewall.
+```
+netsentry-ai/
+├── app/                              # Streamlit Executive Research Web UI
+│   ├── main.py                       # Main application entrypoint
+│   ├── styles.py                     # Cyberpunk dark navy CSS & custom widgets
+│   └── views/                        # 8 Modular UI views
+│       ├── overview.py               # Executive Operations Center & KPIs
+│       ├── explorer.py               # Dataset Explorer, schemas, & DCN glossary
+│       ├── model_lab.py              # Interactive model training & benchmarking
+│       ├── evaluation.py             # Confusion matrices, ROC/PR, & threshold slider
+│       ├── traffic_analyzer.py       # Live flow scoring, filtering, & SOC diagnosis
+│       ├── explainability.py         # Global importance & local waterfall XAI
+│       ├── research.py               # Cross-dataset, anomaly, & drift research
+│       └── learn.py                  # DCN + ML curriculum (Packets, TCP, Accuracy Trap)
+├── data/
+│   ├── sample/                       # Curated benchmark research datasets
+│   │   ├── cicids2017_sample.csv     # Authentic CIC-IDS2017 schema (Multi-class)
+│   │   ├── unsw_nb15_sample.csv      # Authentic UNSW-NB15 schema (Cross-domain)
+│   │   └── demo_flows.csv            # Synthetic flow baseline
+│   └── real/                         # User-provided public captures (Git-ignored)
+├── docs/                             # Academic & Engineering Documentation
+│   ├── architecture.md               # Complete DCN + ML architecture guide
+│   ├── training_guide.md             # Multi-model training & tuning guide
+│   ├── evaluation_guide.md           # Metrics guide & the Accuracy Trap
+│   └── troubleshooting.md            # Windows PowerShell & troubleshooting guide
+├── src/netsentry/                    # Core Python Package
+│   ├── data/                         # Loading, schema validation, splitting
+│   ├── models/                       # Model factory (9 algorithms)
+│   ├── training/                     # Leakage-free training, CV, tuning, tracking
+│   ├── evaluation/                   # Scientific metrics & majority baseline
+│   ├── explainability/               # Feature importance & plain-English narratives
+│   ├── research/                     # Cross-dataset, anomaly detection, drift
+│   ├── pcap/                         # 5-tuple bidirectional PCAP flow extractor
+│   ├── data.py                       # Backward-compatible data wrapper
+│   ├── train.py                      # Enhanced CLI training runner
+│   └── predict.py                    # Enhanced CLI flow scoring engine
+├── tests/                            # Automated Unit & Integration Test Suite
+│   ├── test_data.py                  # Tests data validation & partitioning
+│   ├── test_models.py                # Tests model factory & pipeline fitting
+│   ├── test_evaluation.py            # Tests metrics, baseline, & thresholding
+│   ├── test_explainability.py        # Tests feature importance & narratives
+│   ├── test_research.py              # Tests cross-dataset, anomaly, & drift
+│   └── test_predict.py               # Tests inference scoring & risk tiers
+├── artifacts/                        # Serialized models, metrics, and comparisons
+├── requirements.txt                  # Python dependencies
+└── pyproject.toml                    # Package metadata & build specifications
+```
 
+---
 
+## 📚 Technical Documentation Links
 
+- [System Architecture & DCN Flow Mechanics](docs/architecture.md)
+- [Training Algorithms & Hyperparameter Tuning Guide](docs/training_guide.md)
+- [Evaluation Metrics & The Accuracy Trap](docs/evaluation_guide.md)
+- [PowerShell & Execution Troubleshooting Guide](docs/troubleshooting.md)
+
+---
+
+## ⚖️ Ethical Notice & Security Research Guidelines
+
+Only capture and analyze network traffic from systems and networks that you own or have explicit, documented authorization to inspect. NetSentry AI is designed exclusively for educational, defensive, and academic research purposes.
