@@ -2,6 +2,8 @@
 from .cross_dataset import (
     evaluate_cross_dataset,
     CrossDatasetResult,
+    evaluate_joint_domain_generalization,
+    JointDomainResult,
     COMMON_NETWORK_FLOW_MAPPING,
 )
 from .anomaly import (
@@ -18,6 +20,8 @@ from .drift import (
 __all__ = [
     "evaluate_cross_dataset",
     "CrossDatasetResult",
+    "evaluate_joint_domain_generalization",
+    "JointDomainResult",
     "COMMON_NETWORK_FLOW_MAPPING",
     "benchmark_unsupervised_anomaly",
     "AnomalyBenchmarkResult",

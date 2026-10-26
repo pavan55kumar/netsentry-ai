@@ -42,6 +42,27 @@ class ResearchTests(unittest.TestCase):
         self.assertEqual(res.total_unseen_samples, 2)
         self.assertIn("Zero-Day Simulation", res.findings)
 
+    def test_cross_dataset_and_joint_domain_generalization(self):
+        from netsentry.research.cross_dataset import evaluate_cross_dataset, evaluate_joint_domain_generalization
+        import pandas as pd
+        df_a = pd.DataFrame({
+            "flow_duration_ms": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0],
+            "total_fwd_packets": [1, 2, 1, 2, 10, 20, 15, 25],
+            "total_backward_packets": [1, 1, 1, 1, 5, 10, 8, 12],
+            "flow_bytes_per_second": [100.0, 200.0, 150.0, 250.0, 5000.0, 8000.0, 6000.0, 9000.0],
+            "flow_packets_per_second": [10.0, 15.0, 12.0, 18.0, 500.0, 800.0, 600.0, 900.0],
+            "average_packet_size": [50.0, 60.0, 55.0, 65.0, 300.0, 400.0, 350.0, 450.0],
+            "label": ["benign", "benign", "benign", "benign", "DoS", "DoS", "DoS", "DoS"],
+        })
+        df_b = df_a.copy()
+        res_cross = evaluate_cross_dataset(df_a, df_b, source_name="DemoA", target_name="DemoB")
+        self.assertGreaterEqual(res_cross.in_domain_metrics.f1_macro, 0.0)
+        self.assertGreaterEqual(res_cross.cross_domain_metrics.f1_macro, 0.0)
+
+        res_joint = evaluate_joint_domain_generalization(df_a, df_b, name_a="DemoA", name_b="DemoB")
+        self.assertGreaterEqual(res_joint.test_a_metrics.f1_macro, 0.0)
+        self.assertGreaterEqual(res_joint.test_b_metrics.f1_macro, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
