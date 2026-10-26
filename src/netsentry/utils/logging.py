@@ -46,9 +46,12 @@ def redact_ip_address(ip_str: str) -> str:
     Examples:
         '192.168.1.45' -> '192.168.1.***'
         '10.0.5.120' -> '10.0.5.***'
+        '2001:0db8:85a3:0000:0000:8a2e:0370:7334' -> '2001:0db8:85a3:****'
     """
     if "." in ip_str:
         return IPV4_PATTERN.sub(r"\1.***", ip_str)
+    if ":" in ip_str:
+        return IPV6_PATTERN.sub(r"\1:****", ip_str)
     return ip_str
 
 
@@ -56,6 +59,8 @@ def sanitize_log_message(msg: str) -> str:
     """Scrub sensitive credentials, user home directories, and full host IPs from log text."""
     # Redact IPv4 host octets
     cleaned = IPV4_PATTERN.sub(r"\1.***", msg)
+    # Redact IPv6 host endpoints
+    cleaned = IPV6_PATTERN.sub(r"\1:****", cleaned)
     # Redact key-value secrets (e.g. password=..., api_key: ...)
     cleaned = SECRET_KEY_VALUE_PATTERN.sub(r"\1: [REDACTED_SECRET]", cleaned)
     # Redact standalone secrets (AWS keys, bearer tokens)

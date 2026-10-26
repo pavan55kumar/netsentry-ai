@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "phase": "Phase 9: Independent Research Validation & Security Audit",
+    "timestamp": "2026-10-26 08:49:22 UTC",
+    "python_version": "3.12.3",
+    "platform": "win32",
+    "git_commit_baseline": "b706861",
+    "git_tag_baseline": "phase8-complete"
+  },
+  "audit_checks": {
+    "dataset_splitting_and_leakage": {
+      "status": "PASSED",
+      "train_samples": 3750,
+      "test_samples": 1250,
+      "index_overlap": 0,
+      "disjoint_partition_verified": true,
+      "features_retained_count": 77,
+      "target_leakage_detected_keywords": [
+        "flow_id",
+        "timestamp",
+        "src_ip",
+        "dst_ip",
+        "attack_type"
+      ],
+      "pipeline_imputer_scaler_isolated_to_train": true
+    },
+    "research_metrics_verification": {
+      "status": "PASSED",
+      "audited_metrics": {
+        "lightgbm_holdout_macro_f1": 0.9892,
+        "lightgbm_holdout_fpr": 0.0159,
+        "random_forest_holdout_macro_f1": 0.9767,
+        "random_forest_holdout_fpr": 0.0259,
+        "cross_domain_baseline_f1": 0.3148,
+        "joint_multidomain_training_f1": 0.8932,
+        "unseen_dos_supervised_recall": 0.0,
+        "unseen_dos_isolation_forest_recall": 0.6679,
+        "unseen_dos_isolation_forest_fpr": 0.0758,
+        "five_seed_stability_cic_mean_f1": 0.9822,
+        "five_seed_stability_cic_std_f1": 0.0054,
+        "five_seed_stability_unsw_mean_f1": 0.9919,
+        "five_seed_stability_unsw_std_f1": 0.0023,
+        "robustness_5pct_jitter_perturbed_f1": 0.6617,
+        "robustness_5pct_jitter_flip_rate_pct": 33.12,
+        "robustness_jumbo_frames_perturbed_f1": 0.6639,
+        "robustness_jumbo_frames_flip_rate_pct": 33.28,
+        "robustness_100g_burst_perturbed_f1": 0.985,
+        "robustness_pacing_evasion_count": 4
+      },
+      "provenance_verified": true
+    },
+    "pcap_to_model_validity": {
+      "status": "PASSED",
+      "pcap_file": "test_traffic.pcap",
+      "packets_read": 8,
+      "flows_extracted": 3,
+      "canonical_schema_complete": true,
+      "demo_model_compatibility_verified": true,
+      "schema_mismatch_findings": {
+        "demo_model_feature_count": 8,
+        "cic_ids2017_feature_count": 77,
+        "unsw_nb15_feature_count": 42,
+        "designation": "Functional offline PCAP ingestion demonstration for 8 canonical flow features; does not substitute full 77-feature CICFlowMeter research evaluation."
+      }
+    },
+    "security_and_operational_safety": {
+      "status": "PASSED",
+      "ip_privacy_masking_verified": true,
+      "secret_and_credential_scrubbing_verified": true,
+      "infinite_values_quarantined_not_benign": true,
+      "incompatible_schema_safely_rejected": true
+    }
+  },
+  "execution_summary": {
+    "duration_seconds": 1.356,
+    "all_checks_passed": true,
+    "total_checks_evaluated": 4
+  }
+}

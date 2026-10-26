@@ -57,9 +57,13 @@ LEAKAGE_KEYWORDS = (
     "timestamp",
     "time_stamp",
     "src ip",
+    "src_ip",
     "source ip",
+    "source_ip",
     "dst ip",
+    "dst_ip",
     "destination ip",
+    "destination_ip",
 )
 
 
