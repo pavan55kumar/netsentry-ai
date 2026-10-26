@@ -147,6 +147,12 @@ def render_traffic_analyzer_view():
 
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
 
+    st.info(
+        "🛡️ **Score Interpretation & Methodology Notice:** The displayed prediction reflects statistical similarity to known training attack patterns. "
+        "Confidence scores from supervised pipelines represent estimated class probabilities; they do **not** constitute absolute proof of malicious intent. "
+        "For unsupervised anomaly models, scores represent relative geometric outlier distance and must not be interpreted as calibrated probabilities."
+    )
+
     # Filtering
     filter_choice = st.radio(
         "Filter View",

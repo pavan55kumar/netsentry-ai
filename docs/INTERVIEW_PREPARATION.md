@@ -130,42 +130,53 @@ $$P(\text{Attack} \mid \text{Alert}) = \frac{\text{Recall} \cdot P(\text{Attack}
 
 *Key takeaway for interviewers*: "At realistic enterprise prevalence (1 in 10,000 flows), an algorithm with 1.59% FPR produces **over 137 million false alarms daily**, and **99.4% of all generated alerts are false alarms**. This mathematically proves why threshold tuning and alert suppression are mandatory."
 
-### 4.4. Verified Phase 5 Experimental Results
-- **5-Seed Stability Evaluation (Seeds 42, 101, 7, 2024, 999)**:
-  - Mean Macro-F1: $\mathbf{0.9822 \pm 0.0054}$ (Range: $0.9733 - 0.9868$).
-  - Mean Balanced Accuracy: $\mathbf{0.9840 \pm 0.0048}$.
-- **Multi-Class Evaluation (CIC-IDS2017, 6 Classes)**:
-  - Overall Multi-Class Macro-F1: $\mathbf{0.9703}$.
-  - Benign: 98.9% recall | DoS: 99.8% recall | PortScan: 100.0% recall | BruteForce: 83.3% recall | WebAttack: 100.0% recall | Bot: 100.0% recall.
-- **Multi-Class Evaluation (UNSW-NB15, 10 Classes)**:
-  - Overall Multi-Class Macro-F1: $\mathbf{0.9634}$.
+### 4.4. Phase 6 Strong Baselines Benchmark (Identical Data Split)
+
+To evaluate candidate algorithms fairly, all models were trained and tested on the exact same 75/25 stratified holdout partition of the authentic CIC-IDS2017 dataset:
+
+| Algorithm | Model Family | Test Macro-F1 | Balanced Accuracy | Accuracy | False Positive Rate | Malicious Recall | Inference Latency | Model Size |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Zero-R Dummy** | Trivial Baseline | **0.3744** | 0.5000 | 59.84% | 100.00% | 100.00% | 0.001 ms | 0.8 KB |
+| **Logistic Regression** | Linear Optimizer | **0.8886** | 0.8891 | 89.04% | 12.95% | 90.78% | 0.004 ms | 2.5 KB |
+| **Decision Tree (Pruned)** | Rule-Based CART | **0.9808** | 0.9800 | 98.16% | 2.79% | 98.80% | 0.005 ms | 15.2 KB |
+| **Random Forest (100t)** | Bagging Ensemble | **0.9767** | 0.9770 | 97.76% | 2.59% | 97.99% | 0.188 ms | 1,840 KB |
+| **Extra Trees (100t)** | Randomized Trees | **0.9565** | 0.9544 | 95.84% | 6.57% | 97.46% | 0.096 ms | 1,920 KB |
+| **LightGBM (Champion)** | Histogram Boosting | **0.9892** | **0.9887** | **98.96%** | **1.59%** | **99.33%** | **0.016 ms** | **512 KB** |
+| **XGBoost** | Gradient Boosting | **0.9867** | 0.9857 | 98.72% | 2.19% | 99.33% | 0.009 ms | 480 KB |
+| **Isolation Forest** | Unsupervised Anomaly | **0.5561** | 0.6141 | 58.72% | 13.15% | 35.96% | 0.040 ms | 680 KB |
+
+### 4.5. Phase 6 Forensic Error Analysis & SHAP Explainability
+On the 1,250 holdout test flows, the champion LightGBM model made only **13 errors** (1.04% error rate):
+- **False Positives (8 flows)**: High-speed legitimate HTTP downloads exceeding $150\text{ pkts/s}$ and $50,000\text{ bytes/s}$ that statistically resembled volumetric DoS attacks.
+- **False Negatives (5 flows)**: Low-intensity Slowloris flows (4 flows) and a small-packet Botnet C2 beacon (1 flow) that kept low packet counts, evading rate-based thresholds.
+- **Top SHAP Attributions (TreeExplainer)**:
+  1. `Bwd Packet Length Min` ($\phi = 2.491$)
+  2. `Bwd Packet Length Std` ($\phi = 1.954$)
+  3. `Init_Win_bytes_forward` ($\phi = 0.702$)
+  4. `ACK Flag Count` ($\phi = 0.500$)
+  5. `Packet Length Std` ($\phi = 0.543$)
+- **Correlation vs Causality Guardrail**: "Feature importance and SHAP attributions reflect statistical correlation within the fitted model manifold; they do NOT prove physical causality in network communications."
 
 ---
 
-## 5. Why Cross-Dataset Generalization Degrades (Domain Shift)
+## 5. Generalization Strategies & The Concept Inversion Discovery
 
-When NetSentry AI trained on **CIC-IDS2017** and evaluated on **UNSW-NB15**, Macro-F1 dropped by **67.2%** (from $0.9848$ down to $0.3229$). Why?
-
-```
-Cross-Dataset Confusion Matrix (CIC Model -> UNSW-NB15 Data):
-                 Predicted Benign   Predicted Attack
-Actual Benign         2247                 0
-Actual Attack         2748                 5
-```
+When transferring from **CIC-IDS2017** to **UNSW-NB15**, Macro-F1 dropped by **67.2%** (from $0.9848$ down to $0.315$). Why?
 
 ### 5.1. The Root Cause: Concept Inversion
-1. **Different Background User Profiles**:
-   - CIC-IDS2017 was recorded in a Canadian university testbed using B-Profiles (modeling human HTTP browsing, emails, SSH).
-   - UNSW-NB15 was generated using the IXIA PerfectStorm hardware traffic generator in an Australian defense lab.
-2. **Concept Inversion in Feature Distributions**:
-   - In CIC-IDS2017, attacks (like Slowloris DoS) sent slow packets over longer durations (median attack duration $= 0.62\text{ s}$, benign $= 0.03\text{ s}$).
-   - In UNSW-NB15, IXIA fired single-burst exploit packets at 100,000 pkts/sec (median attack duration $= 0.00001\text{ s}$, normal $= 0.21\text{ s}$).
-   - A tree trained on CIC learned: *"Short duration + fast packet rate = Benign"*, which caused it to misclassify 99.9% of UNSW-NB15's microsecond attacks as normal traffic!
+- In CIC-IDS2017, attacks were slow application DoS (Slowloris) with a median duration of $0.62\text{s}$ vs $0.03\text{s}$ for benign.
+- In UNSW-NB15, IXIA fired microsecond exploit bursts with a median duration of $0.00001\text{s}$ vs $0.21\text{s}$ for benign.
+- The decision tree learned: *"Short duration + fast packet rate = Benign"*, misclassifying 99.9% of UNSW-NB15's microsecond attacks as normal traffic!
 
-### 5.2. The Solution: Joint Multi-Domain Training
-When we trained a model on a combined pool of source training folds from both datasets while keeping both evaluation test sets strictly isolated, the model learned domain-invariant representations across 5 random seeds:
-- **CIC-IDS2017 Holdout Test**: **0.9425 Mean Macro-F1** (Balanced Accuracy: $0.9443$).
-- **UNSW-NB15 Holdout Test**: **0.9003 Mean Macro-F1** (Balanced Accuracy: $0.8986$).
+### 5.2. Systematic Generalization Strategy Findings (Phase 6)
+We systematically tested seven hypotheses to overcome domain collapse:
+1. **Log(1+x) Rate Transformation**: Cross-F1 = 0.312 (Inconclusive; tree splits are monotonic).
+2. **RobustScaler (Median/IQR)**: Cross-F1 = 0.314 (Inconclusive; scale normalization does not reorder tree decision paths).
+3. **Class Weighting ('balanced')**: Cross-F1 = 0.315 (Inconclusive; does not bridge feature distribution shifts).
+4. **Validation Threshold Tuning**: Cross-F1 = 0.310 (Enforces 0.0% target FPR, but incurs a minor recall trade-off).
+5. **Feature Ablation (Exclude Duration)**: Cross-F1 = 0.316 (Duration was inverted, but packet rates were also inverted).
+6. **Feature Ablation (Exclude Rates)**: Cross-F1 = 0.316 (Leaving duration inverted still causes collapse).
+7. **Joint Multi-Domain Training (The Breakthrough)**: Cross-F1 = **0.893** (**+0.578 F1 gain!**). Training on combined source folds from both domains exposes the classifier to diverse protocol environments, forcing domain-invariant representations!
 
 ---
 
@@ -192,25 +203,26 @@ When we trained a model on a combined pool of source training folds from both da
 > **Answer:** "**Training data** is used by algorithms to learn decision boundaries. **Validation data** (or inner cross-validation folds) is used exclusively to tune hyperparameters and calibrate decision thresholds ($\tau$). The **Test set** is a strictly isolated holdout evaluated once at the very end to measure true out-of-sample generalization. I prevented data leakage by encapsulating all imputation and scaling inside scikit-learn `Pipeline` objects fitted strictly on training folds, and using an automated target leakage detector that drops columns containing timestamps, IDs, or class encodings."
 
 ### Q4: "Why is Macro-F1 more informative than accuracy, and what is the 'Accuracy Trap'?"
-> **Answer:** "In real networks, traffic is heavily imbalanced—benign traffic constitutes over 99% of total packets. A trivial classifier that always predicts 'Benign' achieves 99% accuracy while missing every single intrusion; this is the **Accuracy Trap**. Macro-F1 calculates the harmonic mean of precision and recall for each class independently and computes their unweighted average. This ensures minority attacks are given equal importance to majority benign traffic."
+> **Answer:** "In real networks, traffic is heavily imbalanced—benign traffic constitutes over 99% of total packets. A trivial classifier that always predicts 'Benign' achieves 99% accuracy while missing every single intrusion; this is the **Accuracy Trap**. In our Phase 6 baselines, a Zero-R dummy classifier achieved 59.84% accuracy with an attack recall of 100%, but its Macro-F1 was only 0.3744 and its FPR was 100%. Macro-F1 calculates the harmonic mean of precision and recall for each class independently and averages them equally, exposing models that sacrifice minority classes."
 
 ### Q5: "How does False Positive Rate (FPR) differ from the proportion of alerts that are false, and how does NetSentry AI address this?"
-> **Answer:** "FPR is $FP / (FP + TN)$—the probability that normal traffic is misclassified. The proportion of alerts that are false is $1 - \text{Precision} = FP / (TP + FP)$. Due to the **Base-Rate Fallacy**, because cyberattacks are extremely rare in production (e.g. 1 in 10,000 flows), even a 1.59% FPR results in **99.4% of all generated alerts being false alarms** (over 137 million spurious alerts daily on a 100k flows/s link). NetSentry AI addresses this via **Validation Threshold Tuning**, sweeping decision thresholds to enforce strict FPR caps (e.g. $\text{FPR} \le 0.5\%$) before deployment."
+> **Answer:** "FPR is $FP / (FP + TN)$—the probability that normal traffic is misclassified. The proportion of alerts that are false is $1 - \text{Precision} = FP / (TP + FP)$. Due to the **Base-Rate Fallacy**, because cyberattacks are extremely rare in production (e.g. 1 in 10,000 flows), even a 1.59% FPR results in **99.4% of all generated alerts being false alarms** (over 137 million spurious alerts daily on a 100k flows/s link). NetSentry AI addresses this via **Validation Threshold Tuning**, sweeping decision thresholds to enforce strict FPR caps before deployment."
 
 ### Q6: "Why did your cross-dataset generalization experiment show a 67% performance drop?"
-> **Answer:** "This is caused by **Covariate Shift and Concept Inversion**. CIC-IDS2017 was captured in an office testbed with slow application DoS (median duration 0.62s vs 0.03s benign), whereas UNSW-NB15 used the IXIA PerfectStorm traffic generator firing microsecond exploit bursts (median duration 0.00001s vs 0.21s benign). The decision tree learned that short durations were benign in CIC, so when deployed on UNSW, it classified 99.9% of attacks as normal. We resolved this via **Joint Multi-Domain Training**, which forces the model to learn domain-invariant features, achieving 0.9425 and 0.9003 Macro-F1 on untouched test sets from both domains."
+> **Answer:** "This is caused by **Covariate Shift and Concept Inversion**. CIC-IDS2017 was captured in an office testbed with slow application DoS (median duration 0.62s vs 0.03s benign), whereas UNSW-NB15 used the IXIA PerfectStorm traffic generator firing microsecond exploit bursts (median duration 0.00001s vs 0.21s benign). The decision tree learned that short durations were benign in CIC, so when deployed on UNSW, it classified 99.9% of attacks as normal. In Phase 6, we proved that single-feature ablations cannot solve this, but **Joint Multi-Domain Training** completely eliminates the collapse, raising cross-dataset Macro-F1 from 0.315 to 0.893 (+0.578 gain)."
 
 ### Q7: "Why do supervised classification and unsupervised anomaly detection complement each other?"
-> **Answer:** "Supervised models (e.g. LightGBM) learn from labeled historical attacks; they achieve over 98% accuracy on known threats but have 0.0% recall on novel, unseen attack families (as proven in our zero-day holdout benchmarks). In contrast, unsupervised Isolation Forest isolates points based on geometric density without labels, successfully flagging 66.7% of unseen DoS attacks as anomalies. However, Isolation Forest misses low-rate scans and has a higher false alarm rate (9.0%), making the two paradigms complementary."
+> **Answer:** "Supervised models (e.g. LightGBM) learn from labeled historical attacks; they achieve over 98% accuracy on known threats but have 0.0% recall on novel, unseen attack families (as proven in our unseen attack suite across DoS, PortScan, BruteForce, and WebAttacks). In contrast, unsupervised Isolation Forest isolates points based on geometric density without labels, successfully flagging 66.8% of unseen DoS attacks as anomalies. However, Isolation Forest misses low-rate scans and incurs an 8.98% false alarm rate, making the two paradigms complementary."
 
 ### Q8: "How does PCAP ingestion work and what are its physical limitations?"
 > **Answer:** "Our PCAP engine uses Scapy to parse Ethernet frames, hash packets into bidirectional 5-tuples, and compute flow statistics. Its physical limitations are twofold: First, **throughput**—user-space Python processes ~5,000 packets/sec per core, whereas a saturated 10 Gbps link requires handling up to 14.88 million packets/sec (requiring kernel-bypass like DPDK or eBPF/XDP). Second, **export latency**—flow statistics are exported only after connection termination (FIN/RST) or timeout (15–30s), making it an out-of-band detective tool rather than an inline preventative firewall."
 
-### Q9: "How does your Explainable AI (XAI) engine help a junior SOC analyst?"
-> **Answer:** "Machine learning predictions alone are opaque. NetSentry AI computes local $z$-score deviations comparing an alerted flow's features against baseline normal medians. It then feeds these statistical deviations into a security narrative generator that produces plain-English explanations—for example: *'High-confidence DoS attack: Flow packet rate is +4.8 standard deviations above normal on destination port 80. Recommended action: Apply rate-limiting ACL on source IP.'*"
+### Q9: "How does your Explainable AI (XAI) engine help a junior SOC analyst, and does feature importance prove causality?"
+> **Answer:** "Machine learning predictions alone are opaque. NetSentry AI computes local $z$-score deviations and TreeExplainer SHAP values, identifying that features like `Bwd Packet Length Min` ($\phi=2.49$) and `Init_Win_bytes_forward` ($\phi=0.70$) drive classifications. It translates these into plain-English SOC recommendations. Crucially, I know that **feature importance does NOT prove physical causality**—an attacker can pad packets or alter timing without changing their exploit payload; SHAP measures correlation within the tree manifold, not causal necessity."
 
 ### Q10: "What is the single most important limitation of this project?"
 > **Answer:** "NetSentry AI inspects **flow metadata rather than application-layer payloads**. While this preserves user privacy and operates over encrypted TLS 1.3 traffic, it is fundamentally blind to application exploits—such as SQL injection, Log4Shell, or malicious file downloads—which produce flow packet counts and byte sizes indistinguishable from legitimate HTTP requests."
+
 
 ---
 

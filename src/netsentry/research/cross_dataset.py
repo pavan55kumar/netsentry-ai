@@ -115,6 +115,24 @@ def extract_shared_features(df: pd.DataFrame, schema_family: str) -> pd.DataFram
     return std_df
 
 
+def align_flow_datasets(source_df: pd.DataFrame, target_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """Map and align two disparate flow datasets into unified semantic feature schemas.
+
+    Returns:
+        Tuple of (clean_source_df, clean_target_df, shared_feature_names).
+    """
+    src_schema = detect_schema_family(list(source_df.columns))
+    tgt_schema = detect_schema_family(list(target_df.columns))
+    src_std = extract_shared_features(source_df, src_schema)
+    tgt_std = extract_shared_features(target_df, tgt_schema)
+    src_std = src_std.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
+    tgt_std = tgt_std.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
+    src_std = src_std.rename(columns={"__target__": "label"})
+    tgt_std = tgt_std.rename(columns={"__target__": "label"})
+    return src_std, tgt_std, SHARED_FEATURES
+
+
+
 def evaluate_cross_dataset(
     source_df: pd.DataFrame,
     target_df: pd.DataFrame,

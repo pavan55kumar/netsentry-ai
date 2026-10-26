@@ -8,6 +8,10 @@ from .local_explainer import (
     LocalFlowExplanation,
 )
 from .narrative import generate_security_narrative
+from .error_analysis import (
+    perform_comprehensive_error_analysis,
+    ErrorAnalysisReport,
+)
 
 __all__ = [
     "compute_global_importance",
@@ -15,4 +19,7 @@ __all__ = [
     "explain_single_flow",
     "LocalFlowExplanation",
     "generate_security_narrative",
+    "perform_comprehensive_error_analysis",
+    "ErrorAnalysisReport",
 ]
+
