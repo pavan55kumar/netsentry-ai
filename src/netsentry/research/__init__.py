@@ -7,6 +7,8 @@ from .cross_dataset import (
 from .anomaly import (
     benchmark_unsupervised_anomaly,
     AnomalyBenchmarkResult,
+    evaluate_unseen_attack_detection,
+    UnseenAttackResult,
 )
 from .drift import (
     simulate_model_drift,
@@ -19,6 +21,8 @@ __all__ = [
     "COMMON_NETWORK_FLOW_MAPPING",
     "benchmark_unsupervised_anomaly",
     "AnomalyBenchmarkResult",
+    "evaluate_unseen_attack_detection",
+    "UnseenAttackResult",
     "simulate_model_drift",
     "DriftSimulationResult",
 ]

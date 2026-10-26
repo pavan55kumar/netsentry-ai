@@ -112,6 +112,45 @@ def render_research_view():
                     for ins in anom_res.educational_insights:
                         st.info(ins)
 
+            st.markdown("---")
+            st.markdown("##### 🧪 Experiment B: Zero-Day / Unseen Attack Holdout Evaluation")
+            st.caption("Select an entire attack category to completely conceal from supervised training, then evaluate whether the unsupervised detector flags it as an anomaly.")
+
+            # Identify available attack classes
+            all_classes = [c for c in df_ref["Label"].unique() if str(c).upper() != "BENIGN"]
+            held_out = st.selectbox("Select Attack Category to Hold Out (Zero-Day Target)", all_classes, index=0)
+
+            if st.button("🎯 Run Zero-Day Holdout Experiment", type="primary"):
+                with st.spinner(f"Training supervised model without '{held_out}' and evaluating zero-day anomaly detection..."):
+                    from src.netsentry.research.anomaly import evaluate_unseen_attack_detection
+                    zero_day_res = evaluate_unseen_attack_detection(
+                        df=df_ref,
+                        label_column="Label",
+                        held_out_attack=held_out,
+                        benign_label="BENIGN",
+                    )
+
+                    z1, z2, z3, z4 = st.columns(4)
+                    with z1:
+                        st.markdown(render_kpi("Novel Attack Recall (Supervised)", f"{zero_day_res.supervised_recall_on_unseen * 100:.1f}%", f"Trained without {held_out}", "#ef4444" if zero_day_res.supervised_recall_on_unseen < 0.5 else "#38bdf8"), unsafe_allow_html=True)
+                    with z2:
+                        st.markdown(render_kpi("Novel Attack Recall (Anomaly)", f"{zero_day_res.unsupervised_recall_on_unseen * 100:.1f}%", "Zero-Day Flag Rate", "#00f0ff"), unsafe_allow_html=True)
+                    with z3:
+                        st.markdown(render_kpi("Benign FPR (Supervised)", f"{zero_day_res.supervised_benign_fpr * 100:.2f}%", "Normal Traffic Alarms", "#10b981"), unsafe_allow_html=True)
+                    with z4:
+                        st.markdown(render_kpi("Benign FPR (Anomaly)", f"{zero_day_res.unsupervised_benign_fpr * 100:.2f}%", "Unsupervised False Alarms", "#f59e0b"), unsafe_allow_html=True)
+
+                    st.markdown(
+                        f"""
+                        <div class="netsentry-card" style="margin-top: 15px;">
+                            <h4>Zero-Day Attack Research Analysis</h4>
+                            <p>{zero_day_res.findings}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+
     with tab_drift:
         st.markdown("##### 📉 Model Drift Simulation")
         st.caption("Simulate traffic volume surges, flag shifts, or channel noise over time and measure performance degradation.")

@@ -64,6 +64,8 @@ ADVANCED_MODELS = [
     "k_nearest_neighbors",
     "support_vector_machine",
     "mlp_neural_network",
+    "lightgbm",
+    "xgboost",
     "isolation_forest",
 ]
 
@@ -179,6 +181,42 @@ def build_pipeline(model_key: str, random_state: int = 42, fast_mode: bool = Fal
             )),
         ])
 
+    elif model_key == "lightgbm":
+        try:
+            from lightgbm import LGBMClassifier
+        except ImportError:
+            raise ImportError("LightGBM is not installed. Run: pip install lightgbm")
+        trees = 100 if fast_mode else 300
+        return Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("model", LGBMClassifier(
+                n_estimators=trees,
+                learning_rate=0.08,
+                num_leaves=31,
+                random_state=random_state,
+                n_jobs=-1,
+                verbose=-1,
+            )),
+        ])
+
+    elif model_key == "xgboost":
+        try:
+            from xgboost import XGBClassifier
+        except ImportError:
+            raise ImportError("XGBoost is not installed. Run: pip install xgboost")
+        trees = 100 if fast_mode else 300
+        return Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("model", XGBClassifier(
+                n_estimators=trees,
+                learning_rate=0.08,
+                max_depth=6,
+                random_state=random_state,
+                n_jobs=-1,
+                eval_metric="logloss",
+            )),
+        ])
+
     elif model_key == "isolation_forest":
         return Pipeline([
             ("imputer", SimpleImputer(strategy="median")),
@@ -290,6 +328,30 @@ def get_available_models() -> dict[str, ModelSpec]:
             param_grid={
                 "model__hidden_layer_sizes": [(32,), (64, 32), (128, 64)],
                 "model__alpha": [0.0001, 0.001, 0.01],
+            },
+        ),
+        "lightgbm": ModelSpec(
+            key="lightgbm",
+            display_name="LightGBM",
+            family="Gradient Boosting (Histogram)",
+            description="High-speed gradient boosting using tree-based learning algorithms. Highly efficient on tabular flows.",
+            complexity="medium",
+            param_grid={
+                "model__n_estimators": [100, 300],
+                "model__learning_rate": [0.03, 0.08, 0.15],
+                "model__num_leaves": [15, 31, 63],
+            },
+        ),
+        "xgboost": ModelSpec(
+            key="xgboost",
+            display_name="XGBoost",
+            family="Extreme Gradient Boosting",
+            description="Optimized distributed gradient boosting library designed to be highly efficient, flexible and portable.",
+            complexity="medium",
+            param_grid={
+                "model__n_estimators": [100, 300],
+                "model__learning_rate": [0.03, 0.08, 0.15],
+                "model__max_depth": [4, 6, 8],
             },
         ),
         "isolation_forest": ModelSpec(

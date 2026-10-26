@@ -59,6 +59,27 @@ def render_model_lab_view():
         st.warning("⚠️ Please select at least one algorithm to train.")
         return
 
+    # Educational Algorithm Encyclopedia
+    with st.expander("📖 Algorithm Deep-Dive: How They Learn, DCN Suitability, & False Alarms"):
+        st.markdown(
+            """
+            | Algorithm | How It Learns | Why It Is Used | Key Advantage | Limitation & False Alarm Risk |
+            | :--- | :--- | :--- | :--- | :--- |
+            | **Logistic Regression** | Fits linear hyperplane via maximum log-likelihood with L2 penalty. | Wire-speed line-rate filtering baseline. | Sub-millisecond latency (<0.01ms); low memory. | Under-fits complex multi-feature attacks; higher false alarms on bursty traffic. |
+            | **Decision Tree** | Recursively partitions flow features to maximize Gini impurity decrease. | Transparent if-then rules easily translated to firewall syntax. | 100% human-auditable decision paths. | Prone to over-fitting specific port numbers without pruning. |
+            | **Random Forest** | Ensembles hundreds of de-correlated decision trees via bootstrap aggregation. | Standard industry champion for tabular network flow intrusion. | Resilient against noise; high Macro-F1 across attacks. | Higher inference latency (~0.15ms); larger disk footprint. |
+            | **Extra Trees** | Draws random split thresholds for each feature without optimizing cut point. | Extremely fast tree construction with lowest variance. | Flatter decision boundaries; resists overfitting. | Can under-perform on sharp single-feature thresholds. |
+            | **HistGradientBoosting** | Discretizes continuous flow features into 256 integer bins for fast boosting. | High-speed training on tabular flow datasets. | Native NaN handling; fast convergence. | Black-box tree ensembles require XAI attributions. |
+            | **LightGBM** | Leaf-wise gradient boosting using GOSS (Gradient-based One-Side Sampling). | High efficiency on large-scale enterprise captures. | State-of-the-art tabular accuracy; very fast. | Sensitive to hyperparameter tuning on small sample splits. |
+            | **XGBoost** | Exact greedy gradient boosting with second-order Taylor loss expansion. | Rigorous regularized boosting benchmark. | Robust L1/L2 shrinkage prevents overfitting. | Higher memory usage during tree construction. |
+            | **K-Nearest Neighbors** | Classifies flows based on Euclidean distance to $k$ nearest training vectors. | Instance-based non-parametric baseline. | Adapts naturally to irregular cluster topologies. | Inference slows dramatically with large datasets; requires strict scaling. |
+            | **Calibrated SVM** | Finds maximal margin separating hyperplanes with Platt sigmoid calibration. | Robust convex optimization in scaled continuous space. | Strong theoretical generalization guarantees. | $O(N^2)$ training scaling on massive capture files. |
+            | **MLP Neural Net** | Multi-layer perceptron with backpropagation, ReLU activations, and Adam. | Captures non-linear feature interactions between packet rates. | Universal function approximator. | Slowest training; vulnerable to unscaled feature ranges. |
+            | **Isolation Forest** | Randomly isolates flows; anomalies require significantly fewer cuts to isolate. | **Unsupervised zero-day detection** without prior attack labels! | Discovers novel unseen attack categories. | **Higher False Positive Rate:** Large benign file transfers are flagged as anomalies. |
+            """
+        )
+
+
     # Configuration Options
     st.markdown("##### 2. Scientific Experiment Settings")
     col_c1, col_c2, col_c3 = st.columns(3)

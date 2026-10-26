@@ -29,6 +29,20 @@ class ResearchTests(unittest.TestCase):
         self.assertEqual(len(res.macro_f1_scores), 3)
         self.assertIn("Simulated Volumetric Spike", res.analysis)
 
+    def test_unseen_attack_detection(self):
+        from netsentry.research.anomaly import evaluate_unseen_attack_detection
+        import pandas as pd
+        df = pd.DataFrame({
+            "f1": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 50.0, 55.0],
+            "f2": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 500.0, 550.0],
+            "attack": ["benign"] * 6 + ["DoS"] * 4 + ["ZeroDayScan"] * 2,
+        })
+        res = evaluate_unseen_attack_detection(df, label_column="attack", held_out_attack="ZeroDayScan", benign_label="benign")
+        self.assertEqual(res.held_out_attack, "ZeroDayScan")
+        self.assertEqual(res.total_unseen_samples, 2)
+        self.assertIn("Zero-Day Simulation", res.findings)
+
 
 if __name__ == "__main__":
     unittest.main()
+

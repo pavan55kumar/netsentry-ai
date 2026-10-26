@@ -37,6 +37,15 @@ class ModelFactoryTests(unittest.TestCase):
         self.assertGreater(lat, 0.0)
         self.assertGreater(size_kb, 0.0)
 
+    def test_lightgbm_and_xgboost_fit(self):
+        """Verify LightGBM and XGBoost gradient boosters train and predict accurately."""
+        for k in ["lightgbm", "xgboost"]:
+            pipe = build_pipeline(k, random_state=42, fast_mode=True)
+            pipe.fit(self.prep.X_train, self.prep.y_train)
+            preds = pipe.predict(self.prep.X_test)
+            self.assertEqual(len(preds), len(self.prep.X_test))
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -59,6 +59,28 @@ class DataTests(unittest.TestCase):
         self.assertEqual(len(prep.X_train), 6)
         self.assertEqual(len(prep.X_test), 2)
 
+    def test_invalid_schema_raises_error(self):
+        """Verify that missing label column or absent numeric features raises ValueError."""
+        df_no_label = pd.DataFrame({"f1": [1, 2], "f2": [3, 4]})
+        with self.assertRaises(ValueError):
+            prepare_data(df_no_label, label_column="non_existent")
+
+        df_no_numeric = pd.DataFrame({"cat1": ["a", "b"], "cat2": ["x", "y"], "label": ["0", "1"]})
+        with self.assertRaises(ValueError):
+            prepare_data(df_no_numeric, label_column="label")
+
+    def test_infinite_and_missing_value_handling(self):
+        """Verify that infinite values (e.g. from 0-duration division) are safely handled."""
+        df = pd.DataFrame({
+            "flow_bytes_per_second": [100.0, np.inf, 300.0, -np.inf, 500.0, 600.0, 700.0, 800.0],
+            "syn_flag_count": [1, 0, 1, 0, 1, 0, 1, 0],
+            "label": ["benign", "benign", "benign", "benign", "malicious", "malicious", "malicious", "malicious"],
+        })
+        prep = prepare_data(df, label_column="label", test_size=0.25, random_state=42)
+        # Infinite values should be replaced with NaN, and imputer inside pipeline will handle them
+        self.assertFalse(np.isinf(prep.X_train.to_numpy()).any())
+        self.assertFalse(np.isinf(prep.X_test.to_numpy()).any())
+
 
 if __name__ == "__main__":
     unittest.main()
