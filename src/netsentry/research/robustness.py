@@ -45,13 +45,19 @@ class PerturbationResult:
     mean_score_delta: float
     total_samples: int
     num_flipped: int
+    status: str = "COMPLETED"  # 'COMPLETED', 'UNSUPPORTED'
+    features_perturbed: list[str] = field(default_factory=list)
+    transformation_verified: bool = True
     details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "test_name": self.test_name,
             "category": self.category,
+            "status": self.status,
             "description": self.description,
+            "features_perturbed": self.features_perturbed,
+            "transformation_verified": self.transformation_verified,
             "original_macro_f1": round(self.original_macro_f1, 4),
             "perturbed_macro_f1": round(self.perturbed_macro_f1, 4),
             "f1_delta": round(self.f1_delta, 4),
@@ -97,6 +103,16 @@ def _calc_fpr_and_f1(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, flo
     return f1, fpr
 
 
+def _find_matching_columns(columns: list[str], keywords: list[str]) -> list[str]:
+    """Find all column names matching any of the specified lowercase keywords."""
+    matched = []
+    for col in columns:
+        c_lower = col.lower().strip()
+        if any(kw in c_lower for kw in keywords):
+            matched.append(col)
+    return matched
+
+
 def evaluate_single_perturbation(
     pipeline: Any,
     X_orig: pd.DataFrame,
@@ -105,16 +121,45 @@ def evaluate_single_perturbation(
     test_name: str,
     category: str,
     description: str,
+    features_perturbed: list[str] | None = None,
 ) -> PerturbationResult:
     """Compare baseline pipeline performance against perturbed input traffic."""
+    # Check if any features were actually modified
+    pert_cols = features_perturbed if features_perturbed is not None else list(X_orig.columns)
+    if not pert_cols:
+        # Schema does not support this perturbation
+        return PerturbationResult(
+            test_name=test_name,
+            category=category,
+            description=f"{description} (UNSUPPORTED: Target features not present in dataset schema)",
+            original_macro_f1=0.0,
+            perturbed_macro_f1=0.0,
+            f1_delta=0.0,
+            flip_rate_pct=0.0,
+            original_fpr=0.0,
+            perturbed_fpr=0.0,
+            fpr_delta=0.0,
+            mean_score_delta=0.0,
+            total_samples=len(y_true),
+            num_flipped=0,
+            status="UNSUPPORTED",
+            features_perturbed=[],
+            transformation_verified=False,
+            details={"unsupported_reason": "No matching feature columns found in dataset schema."},
+        )
+
     # Baseline predictions
     y_true_arr = y_true.to_numpy()
     orig_preds = pipeline.predict(X_orig)
     orig_f1, orig_fpr = _calc_fpr_and_f1(y_true_arr, orig_preds)
 
+    # Verify that input features actually changed
+    is_changed = not X_perturbed[pert_cols].equals(X_orig[pert_cols])
+
     # Perturbed predictions
     pert_preds = pipeline.predict(X_perturbed)
     pert_f1, pert_fpr = _calc_fpr_and_f1(y_true_arr, pert_preds)
+
 
     # Flip statistics
     flips = (orig_preds != pert_preds)
@@ -145,6 +190,9 @@ def evaluate_single_perturbation(
         mean_score_delta=mean_score_delta,
         total_samples=len(y_true),
         num_flipped=num_flipped,
+        status="COMPLETED",
+        features_perturbed=pert_cols,
+        transformation_verified=is_changed,
         details={
             "malicious_to_benign_flips": int(((orig_preds == 1) & (pert_preds == 0)).sum()),
             "benign_to_malicious_flips": int(((orig_preds == 0) & (pert_preds == 1)).sum()),
@@ -154,15 +202,16 @@ def evaluate_single_perturbation(
 
 def apply_gaussian_measurement_noise(
     X: pd.DataFrame, noise_pct: float = 0.05, random_state: int = 42
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, list[str]]:
     """Add zero-mean Gaussian jitter to continuous features obeying physical positivity."""
     rng = np.random.default_rng(random_state)
     X_pert = X.copy()
     numeric_cols = list(X.select_dtypes(include=[np.number]).columns)
+    modified_cols = []
 
     for col in numeric_cols:
         # Do not add continuous noise to discrete TCP flag counts
-        if "flag" in col.lower() or "count" in col.lower():
+        if "flag" in col.lower() or "count" in col.lower() or "port" in col.lower():
             continue
         vals = X[col].to_numpy(dtype=float)
         std = np.nanstd(vals)
@@ -171,13 +220,14 @@ def apply_gaussian_measurement_noise(
         noise = rng.normal(0, std * noise_pct, size=len(vals))
         new_vals = np.maximum(vals + noise, 0.0)
         X_pert[col] = new_vals
+        modified_cols.append(col)
 
-    return X_pert
+    return X_pert, modified_cols
 
 
 def apply_missing_feature_injection(
     X: pd.DataFrame, missing_ratio: float = 0.10, random_state: int = 42
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, list[str]]:
     """Randomly inject NaN missing values across feature matrix to test imputation resilience."""
     rng = np.random.default_rng(random_state)
     X_pert = X.copy()
@@ -187,49 +237,83 @@ def apply_missing_feature_injection(
         mask = rng.uniform(0, 1, size=len(X)) < missing_ratio
         X_pert.loc[mask, col] = np.nan
 
-    return X_pert
+    return X_pert, numeric_cols
 
 
-def apply_extreme_valid_stress(X: pd.DataFrame, stress_type: str) -> pd.DataFrame:
-    """Inject physically plausible extreme edge cases common in enterprise networks."""
+def apply_extreme_valid_stress(X: pd.DataFrame, stress_type: str) -> tuple[pd.DataFrame, list[str]]:
+    """Inject physically plausible extreme edge cases supporting multiple benchmark schemas."""
     X_pert = X.copy()
+    modified_cols = []
+    all_cols = list(X_pert.columns)
 
     if stress_type == "jumbo_frames":
         # Data center 9000-byte MTU jumbo frame traffic
-        if "average_packet_size" in X_pert.columns:
-            X_pert["average_packet_size"] = 8960.0
-        if "flow_bytes_per_second" in X_pert.columns:
-            X_pert["flow_bytes_per_second"] = X_pert["flow_bytes_per_second"] * 6.0
+        size_cols = _find_matching_columns(all_cols, [
+            "average packet size", "packet length mean", "max packet length",
+            "fwd packet length max", "bwd packet length max", "avg fwd segment size",
+            "avg bwd segment size", "average_packet_size", "smean", "dmean",
+        ])
+        for col in size_cols:
+            X_pert[col] = 8960.0
+            modified_cols.append(col)
+
+        # Scale byte rates corresponding to 6x packet size increase
+        byte_rate_cols = _find_matching_columns(all_cols, ["flow bytes/s", "flow_bytes_per_second"])
+        for col in byte_rate_cols:
+            X_pert[col] = X_pert[col] * 6.0
+            modified_cols.append(col)
 
     elif stress_type == "line_rate_100g":
         # 100 Gbps line-rate burst ($1.25e10 B/s)
-        if "flow_bytes_per_second" in X_pert.columns:
-            X_pert["flow_bytes_per_second"] = 1.25e10
-        if "flow_packets_per_second" in X_pert.columns:
-            X_pert["flow_packets_per_second"] = 1.48e7  # 100 Gbps line-rate packet burst
+        byte_cols = _find_matching_columns(all_cols, ["flow bytes/s", "flow_bytes_per_second"])
+        for col in byte_cols:
+            X_pert[col] = 1.25e10
+            modified_cols.append(col)
+
+        pkt_cols = _find_matching_columns(all_cols, ["flow packets/s", "flow_packets_per_second", "fwd packets/s", "bwd packets/s"])
+        for col in pkt_cols:
+            X_pert[col] = 1.48e7
+            modified_cols.append(col)
 
     elif stress_type == "microsecond_burst":
-        # Sub-millisecond hardware probe
-        if "flow_duration_ms" in X_pert.columns:
-            X_pert["flow_duration_ms"] = 0.005  # 5 microseconds
-        if "total_fwd_packets" in X_pert.columns:
-            X_pert["total_fwd_packets"] = 1
-        if "total_backward_packets" in X_pert.columns:
-            X_pert["total_backward_packets"] = 0
+        dur_cols = _find_matching_columns(all_cols, ["flow duration", "flow_duration_ms", "dur"])
+        for col in dur_cols:
+            X_pert[col] = 5.0  # 5 microseconds in CIC or 0.005 ms in demo
+            modified_cols.append(col)
 
-    return X_pert
+        fwd_cols = _find_matching_columns(all_cols, ["total fwd packets", "total_fwd_packets", "spkts"])
+        for col in fwd_cols:
+            X_pert[col] = 1
+            modified_cols.append(col)
+
+    return X_pert, modified_cols
 
 
-def apply_adversarial_pacing(X: pd.DataFrame, pace_factor: float = 10.0) -> pd.DataFrame:
-    """Simulate Slowloris / low-and-slow rate attenuation evasion."""
+def apply_adversarial_pacing(X: pd.DataFrame, pace_factor: float = 10.0) -> tuple[pd.DataFrame, list[str]]:
+    """Simulate Slowloris / low-and-slow rate attenuation evasion across schemas."""
     X_pert = X.copy()
-    if "flow_duration_ms" in X_pert.columns:
-        X_pert["flow_duration_ms"] = X_pert["flow_duration_ms"] * pace_factor
-    if "flow_packets_per_second" in X_pert.columns:
-        X_pert["flow_packets_per_second"] = np.maximum(X_pert["flow_packets_per_second"] / pace_factor, 0.01)
-    if "flow_bytes_per_second" in X_pert.columns:
-        X_pert["flow_bytes_per_second"] = np.maximum(X_pert["flow_bytes_per_second"] / pace_factor, 0.1)
-    return X_pert
+    modified_cols = []
+    all_cols = list(X_pert.columns)
+
+    # Dilate flow duration (pacing packets over longer time interval)
+    dur_cols = _find_matching_columns(all_cols, ["flow duration", "flow_duration_ms", "dur"])
+    for col in dur_cols:
+        X_pert[col] = X_pert[col] * pace_factor
+        modified_cols.append(col)
+
+    # Attenuate packet transmission rates
+    pkt_rate_cols = _find_matching_columns(all_cols, ["flow packets/s", "flow_packets_per_second", "fwd packets/s", "bwd packets/s"])
+    for col in pkt_rate_cols:
+        X_pert[col] = np.maximum(X_pert[col] / pace_factor, 0.01)
+        modified_cols.append(col)
+
+    # Attenuate byte transmission rates
+    byte_rate_cols = _find_matching_columns(all_cols, ["flow bytes/s", "flow_bytes_per_second"])
+    for col in byte_rate_cols:
+        X_pert[col] = np.maximum(X_pert[col] / pace_factor, 0.1)
+        modified_cols.append(col)
+
+    return X_pert, modified_cols
 
 
 def run_robustness_evaluation_suite(
@@ -242,72 +326,79 @@ def run_robustness_evaluation_suite(
     results: list[PerturbationResult] = []
 
     # 1. Measurement Noise (5% NIC jitter)
-    X_noise_5 = apply_gaussian_measurement_noise(X_test, noise_pct=0.05, random_state=42)
+    X_noise_5, cols_noise_5 = apply_gaussian_measurement_noise(X_test, noise_pct=0.05, random_state=42)
     res_noise_5 = evaluate_single_perturbation(
         pipeline, X_test, X_noise_5, y_test,
         test_name="Measurement Jitter (5%)",
         category="measurement_noise",
         description="Simulates +/- 5% hardware NIC timestamp and counter clock drift.",
+        features_perturbed=cols_noise_5,
     )
     results.append(res_noise_5)
 
     # 2. Measurement Noise (15% High Jitter)
-    X_noise_15 = apply_gaussian_measurement_noise(X_test, noise_pct=0.15, random_state=42)
+    X_noise_15, cols_noise_15 = apply_gaussian_measurement_noise(X_test, noise_pct=0.15, random_state=42)
     res_noise_15 = evaluate_single_perturbation(
         pipeline, X_test, X_noise_15, y_test,
         test_name="High Measurement Jitter (15%)",
         category="measurement_noise",
         description="Simulates extreme +/- 15% packet delay variation across congested switches.",
+        features_perturbed=cols_noise_15,
     )
     results.append(res_noise_15)
 
     # 3. Missing Feature Dropout (10%)
-    X_drop_10 = apply_missing_feature_injection(X_test, missing_ratio=0.10, random_state=42)
+    X_drop_10, cols_drop_10 = apply_missing_feature_injection(X_test, missing_ratio=0.10, random_state=42)
     res_drop_10 = evaluate_single_perturbation(
         pipeline, X_test, X_drop_10, y_test,
         test_name="Feature Dropout (10% Missing)",
         category="missing_features",
         description="Simulates 10% random telemetry loss from sampled NetFlow/sFlow sensors.",
+        features_perturbed=cols_drop_10,
     )
     results.append(res_drop_10)
 
     # 4. Missing Feature Dropout (25%)
-    X_drop_25 = apply_missing_feature_injection(X_test, missing_ratio=0.25, random_state=42)
+    X_drop_25, cols_drop_25 = apply_missing_feature_injection(X_test, missing_ratio=0.25, random_state=42)
     res_drop_25 = evaluate_single_perturbation(
         pipeline, X_test, X_drop_25, y_test,
         test_name="Severe Feature Dropout (25% Missing)",
         category="missing_features",
         description="Simulates 25% sensor packet drop or unpopulated flow meter fields.",
+        features_perturbed=cols_drop_25,
     )
     results.append(res_drop_25)
 
     # 5. Extreme Physical Traffic: Jumbo Frames (MTU 9000)
-    X_jumbo = apply_extreme_valid_stress(X_test, "jumbo_frames")
+    X_jumbo, cols_jumbo = apply_extreme_valid_stress(X_test, "jumbo_frames")
     res_jumbo = evaluate_single_perturbation(
         pipeline, X_test, X_jumbo, y_test,
         test_name="Enterprise Jumbo Frames (MTU 9000)",
         category="extreme_values",
         description="Examines model behavior when encountering storage-network 9KB frames.",
+        features_perturbed=cols_jumbo,
     )
     results.append(res_jumbo)
 
     # 6. Extreme Physical Traffic: Line-Rate 100 Gbps Burst
-    X_100g = apply_extreme_valid_stress(X_test, "line_rate_100g")
+    X_100g, cols_100g = apply_extreme_valid_stress(X_test, "line_rate_100g")
     res_100g = evaluate_single_perturbation(
         pipeline, X_test, X_100g, y_test,
         test_name="100 Gbps Line-Rate Burst",
         category="extreme_values",
         description="Tests numerical stability under 12.5 GB/s wire-speed bursts.",
+        features_perturbed=cols_100g,
     )
     results.append(res_100g)
 
     # 7. Adversarial Low-and-Slow Rate Pacing (Slowloris evasion)
-    X_pacing = apply_adversarial_pacing(X_test, pace_factor=10.0)
+    X_pacing, cols_pacing = apply_adversarial_pacing(X_test, pace_factor=10.0)
     res_pacing = evaluate_single_perturbation(
         pipeline, X_test, X_pacing, y_test,
         test_name="Adversarial Low-and-Slow Pacing",
         category="rate_pacing",
         description="Adversary artificially dilates flow duration 10x to suppress packet rate.",
+        features_perturbed=cols_pacing,
     )
     results.append(res_pacing)
 
@@ -315,8 +406,9 @@ def run_robustness_evaluation_suite(
     vulnerabilities = []
     recommendations = []
 
-    # Check for severe F1 drop
-    max_f1_drop = max([abs(r.f1_delta) for r in results if r.f1_delta < 0] + [0.0])
+    # Check for severe F1 drop among completed tests
+    completed = [r for r in results if r.status == "COMPLETED"]
+    max_f1_drop = max([abs(r.f1_delta) for r in completed if r.f1_delta < 0] + [0.0])
     if max_f1_drop > 0.10:
         vulnerabilities.append(f"Model exhibits severe performance degradation under stress (max Macro-F1 drop: {max_f1_drop:.3f}).")
         recommendations.append("Incorporate perturbed training samples (noise augmentation) during pipeline fitting.")
@@ -332,8 +424,14 @@ def run_robustness_evaluation_suite(
         vulnerabilities.append(f"Adversarial rate pacing enabled {pacing_mal_to_ben} attacks to evade detection by lowering transmission rates.")
         recommendations.append("Do not rely solely on volumetric rate features; combine with TCP flag ratios and payload state metrics.")
 
+    # Check for jumbo frame false positives
+    jumbo_ben_to_mal = res_jumbo.details.get("benign_to_malicious_flips", 0)
+    if jumbo_ben_to_mal > 0:
+        vulnerabilities.append(f"Enterprise Jumbo Frames triggered {jumbo_ben_to_mal} false positive alerts on benign large-packet traffic.")
+        recommendations.append("Calibrate packet size bounds for enterprise storage networks utilizing MTU 9000.")
+
     # Compute aggregate resilience score (100 - weighted degradation)
-    avg_flip = float(np.mean([r.flip_rate_pct for r in results]))
+    avg_flip = float(np.mean([r.flip_rate_pct for r in completed])) if completed else 0.0
     resilience_score = max(0.0, min(100.0, 100.0 - (avg_flip * 1.5) - (max_f1_drop * 100.0)))
 
     if not vulnerabilities:
@@ -348,3 +446,4 @@ def run_robustness_evaluation_suite(
         vulnerabilities_found=vulnerabilities,
         recommendations=recommendations,
     )
+

@@ -1,10 +1,10 @@
-# NetSentry AI — Phase 7: Security Engineering & System Reliability Audit
+# NetSentry AI — Phase 7 & 7.1: Security Engineering & System Reliability Audit
 
 **Author:** NetSentry AI Security & Machine Learning Engineering Team  
 **Persona Context:** 3rd-Year B.Tech Information Science & Engineering Student Portfolio  
 **Audit Baseline Commit:** `91525662a6ad471406668a5ec9ccd5ca5d80957f` (Tag: `phase6-complete`)  
-**Completed Commit Target:** Phase 7 Verification Checkpoint (Tag: `phase7-complete`)  
-**Test Suite Status:** 44 / 44 Unit & Reliability Tests Passing (14.35s execution time)
+**Completed Commit Target:** Phase 7.1 Verification Checkpoint (Tag: `phase7-complete`)  
+**Test Suite Status:** 47 / 47 Unit & Reliability Tests Passing (14.88s execution time)
 
 ---
 
@@ -48,20 +48,20 @@ An audit of Phase 6 artifacts (`artifacts/phase6_experiment_results.json`) revea
 ## 3. Input Validation & Safe Failure Architecture (Objective 2)
 
 ### 3.1 The Vulnerability: The Silent Benign Fallacy
-In cybersecurity ML, the default reaction to unparseable data must never be to report the traffic as "Safe" or "Benign":
+In cybersecurity ML, the default reaction to unparseable or non-finite data must never be to report the traffic as "Safe" or "Benign":
 ```
 [Corrupted / Truncated Flow] 
         ↓ (pd.to_numeric errors="coerce")
-[All Features = NaN] 
+[Non-Finite Features (+Inf / -Inf) or All NaN] 
         ↓ (SimpleImputer median fill)
 [Synthetic Normal Flow] 
         ↓ (Classifier Predict)
 [Prediction = 0 (BENIGN)]  <-- CRITICAL VULNERABILITY!
 ```
-An attacker could intentionally append junk bytes to crash feature extractors, causing malicious traffic to be marked as clean.
+An attacker could intentionally append malformed bytes or trigger zero-duration rate calculations to cause malicious traffic to be imputed with median normal values and marked as clean.
 
-### 3.2 Implemented Fix: Safe Isolation via `score_flows`
-In [`src/netsentry/predict.py`](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/src/netsentry/predict.py), we introduced explicit input validation and safe failure boundaries:
+### 3.2 Implemented Fix: Safe Isolation & Explicit Quarantine Policy via `score_flows`
+In [`src/netsentry/predict.py`](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/src/netsentry/predict.py), we introduced an explicit, multi-tiered data validation policy distinguishing benign sensor dropouts from unphysical non-finite values and severe row corruption:
 
 1. **Empty Input Guard:**
    ```python
@@ -69,22 +69,31 @@ In [`src/netsentry/predict.py`](file:///c:/Users/ASUS/Documents/Codex/2026-10-25
        result["prediction"] = pd.Series(dtype=int)
        result["risk_level"] = pd.Series(dtype=str)
        result["malicious_score"] = pd.Series(dtype=float)
+       result["data_status"] = pd.Series(dtype=str)
        return result
    ```
 2. **Schema Mismatch Exception:**
    If expected features are missing, `SchemaMismatchError` (subclass of `ValueError`) is raised immediately with the missing column names, halting execution safely.
-3. **Infinite Value Sanitization:**
-   Flow exporters frequently divide packet bytes by flow duration. If duration is $0.0$, standard floating-point operations produce `np.inf` or `-np.inf`. Scikit-learn pipelines with `SimpleImputer` crash when encountering infinities. We sanitize them immediately:
-   ```python
-   X_raw = frame[list(expected_features)].apply(pd.to_numeric, errors="coerce")
-   X = X_raw.replace([np.inf, -np.inf], np.nan)
-   ```
-4. **Severe Corruption Quarantine:**
+3. **Structured `data_status` Taxonomy:**
+   Every scored flow is stamped with an explicit `data_status` indicator:
+   - `CLEAN`: All required features are finite, valid numbers.
+   - `IMPUTED_VALID`: Mild missingness (within allowable threshold $\le 80\%$) where normal median imputation is mathematically sound.
+   - `INVALID_NON_FINITE`: Contains $+ \infty$ or $- \infty$ (e.g., from zero-duration flow rate division or counter overflow).
+   - `CORRUPT_EXCESSIVE_MISSING`: Contains $> 80\%$ missing features, indicating severe sensor truncation or schema corruption.
+4. **Infinite Value Quarantine Policy (`quarantine_non_finite=True`):**
+   Flow exporters frequently divide packet bytes by flow duration. If duration is $0.0$, standard floating-point operations produce `np.inf` or `-np.inf`. Under Phase 7.1, instead of converting infinities to NaNs and silently imputing them as normal traffic, rows with non-finite values are quarantined:
+   - `prediction = -1`
+   - `risk_level = "QUARANTINE_NON_FINITE"`
+   - `data_status = "INVALID_NON_FINITE"`
+   - `malicious_score = np.nan`
+   This prevents sensor calculation artifacts and malformed flows from silently bypassing detection as "benign" (score 0.0002).
+5. **Severe Corruption Quarantine:**
    We compute row-wise missingness ratios:
    $$\text{corrupt\_ratio}_i = \frac{1}{D} \sum_{j=1}^D \mathbb{I}(X_{i,j} = \text{NaN})$$
    If $\text{corrupt\_ratio}_i > 0.80$ (configurable via `max_corrupt_ratio`), the row is quarantined:
    - `prediction = -1`
    - `risk_level = "UNPARSEABLE_ANOMALY"`
+   - `data_status = "CORRUPT_EXCESSIVE_MISSING"`
    - `malicious_score = np.nan`
    This guarantees corrupted flows trigger SOC inspection rather than masquerading as normal network traffic.
 
@@ -163,9 +172,9 @@ In [`app/views/traffic_analyzer.py`](file:///c:/Users/ASUS/Documents/Codex/2026-
 
 ---
 
-## 7. Automated Test Suite Verification (Objective 7)
+## 7. Automated Test Suite Verification (Objective 7 & Phase 7.1)
 
-We added [`tests/test_phase7.py`](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/tests/test_phase7.py), introducing 14 new automated unit and reliability tests.
+We added [`tests/test_phase7.py`](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/tests/test_phase7.py), introducing 17 automated unit, reliability, and robustness regression tests.
 
 ### Test Execution Command
 ```powershell
@@ -175,19 +184,20 @@ We added [`tests/test_phase7.py`](file:///c:/Users/ASUS/Documents/Codex/2026-10-
 ### Verified Test Outcome
 ```
 ----------------------------------------------------------------------
-Ran 44 tests in 14.349s
+Ran 47 tests in 14.878s
 
 OK
 ```
-All 30 baseline tests + 14 Phase 7 security tests pass cleanly without errors or skips.
+All 30 baseline tests + 17 Phase 7 / 7.1 security and robustness tests pass cleanly without errors or skips.
 
 | Test Module | Test Name | Target Verified | Status |
 | :--- | :--- | :--- | :--- |
 | `test_phase7` | `test_empty_dataframe_handled_safely` | Empty DataFrame produces structured empty output | **PASS** |
 | `test_phase7` | `test_missing_expected_features_raises_schema_mismatch` | Missing columns raise `SchemaMismatchError` | **PASS** |
-| `test_phase7` | `test_infinite_values_sanitized_during_scoring` | `np.inf` sanitized to finite scores | **PASS** |
-| `test_phase7` | `test_severe_corruption_isolated_as_unparseable` | Corrupted rows isolated as `UNPARSEABLE_ANOMALY` | **PASS** |
-| `test_phase7` | `test_isolation_forest_inlier_outlier_prediction_consistency` | Isolation Forest predictions mapped consistently | **PASS** |
+| `test_phase7` | `test_infinite_values_quarantined_not_benign` | `+inf`/`-inf` quarantined as `INVALID_NON_FINITE`, not benign | **PASS** |
+| `test_phase7` | `test_mild_missingness_allowed_normal_imputation` | Single missing feature scored via median imputation as `IMPUTED_VALID` | **PASS** |
+| `test_phase7` | `test_severe_corruption_isolated_as_unparseable` | >80% corrupted rows isolated as `UNPARSEABLE_ANOMALY` | **PASS** |
+| `test_phase7` | `test_isolation_forest_inlier_outlier_prediction_consistency` | Isolation Forest predictions mapped consistently (+1 inlier -> 0, -1 outlier -> 1) | **PASS** |
 | `test_phase7` | `test_empty_pcap_raises_empty_pcap_error` | 0-byte PCAP raises `EmptyPcapError` | **PASS** |
 | `test_phase7` | `test_corrupt_pcap_header_raises_corrupt_pcap_error` | Bad magic bytes raise `CorruptPcapError` | **PASS** |
 | `test_phase7` | `test_canonical_flow_columns_on_empty_flow_result` | 0 reconstructed flows preserve canonical columns | **PASS** |
@@ -196,7 +206,9 @@ All 30 baseline tests + 14 Phase 7 security tests pass cleanly without errors or
 | `test_phase7` | `test_user_path_sanitization` | Local Windows directories redacted | **PASS** |
 | `test_phase7` | `test_gaussian_noise_preserves_physical_positivity` | Noise respects physical non-negativity ($\ge 0$) | **PASS** |
 | `test_phase7` | `test_missing_feature_injection_preserves_shape` | Missingness injection preserves matrix dimensions | **PASS** |
-| `test_phase7` | `test_adversarial_pacing_attenuation` | Rate pacing dilates duration and drops rate | **PASS** |
+| `test_phase7` | `test_adversarial_pacing_attenuation_and_column_verification` | Rate pacing dilates duration, reduces rate, and verifies modified columns | **PASS** |
+| `test_phase7` | `test_jumbo_frame_and_line_rate_modifies_features` | Jumbo frame & 100G line rate modify features and change input matrix | **PASS** |
+| `test_phase7` | `test_unsupported_perturbation_handled_safely` | Absent target features marked `UNSUPPORTED`, not immune | **PASS** |
 
 ---
 

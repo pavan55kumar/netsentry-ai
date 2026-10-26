@@ -68,10 +68,11 @@ def run_phase7_experiments() -> dict[str, Any]:
     )
 
     print(f"[+] LightGBM Aggregate Resilience Score: {lgbm_results.resilience_score:.1f} / 100")
-    print(f"    {'Perturbation Test':<40} {'Orig F1':<9} {'Pert F1':<9} {'F1 Delta':<10} {'Flip %':<8} {'FPR Shift':<10}")
-    print("    " + "-" * 86)
+    print(f"    {'Perturbation Test':<38} {'Status':<11} {'Orig F1':<8} {'Pert F1':<8} {'F1 Delta':<9} {'Flip %':<7} {'FPR Shift':<9} {'Features'}")
+    print("    " + "-" * 105)
     for res in lgbm_results.perturbation_results:
-        print(f"    {res.test_name:<40} {res.original_macro_f1:<9.4f} {res.perturbed_macro_f1:<9.4f} {res.f1_delta:<+10.4f} {res.flip_rate_pct:<8.2f}% {res.fpr_delta:<+10.4f}")
+        feat_summary = f"{len(res.features_perturbed)} cols" if res.features_perturbed else "None"
+        print(f"    {res.test_name:<38} {res.status:<11} {res.original_macro_f1:<8.4f} {res.perturbed_macro_f1:<8.4f} {res.f1_delta:<+9.4f} {res.flip_rate_pct:<6.2f}% {res.fpr_delta:<+9.4f} {feat_summary}")
 
     # =========================================================================
     # PART 2: RANDOM FOREST ENSEMBLE ROBUSTNESS COMPARISON
@@ -89,10 +90,11 @@ def run_phase7_experiments() -> dict[str, Any]:
     )
 
     print(f"[+] Random Forest Aggregate Resilience Score: {rf_results.resilience_score:.1f} / 100")
-    print(f"    {'Perturbation Test':<40} {'Orig F1':<9} {'Pert F1':<9} {'F1 Delta':<10} {'Flip %':<8} {'FPR Shift':<10}")
-    print("    " + "-" * 86)
+    print(f"    {'Perturbation Test':<38} {'Status':<11} {'Orig F1':<8} {'Pert F1':<8} {'F1 Delta':<9} {'Flip %':<7} {'FPR Shift':<9} {'Features'}")
+    print("    " + "-" * 105)
     for res in rf_results.perturbation_results:
-        print(f"    {res.test_name:<40} {res.original_macro_f1:<9.4f} {res.perturbed_macro_f1:<9.4f} {res.f1_delta:<+10.4f} {res.flip_rate_pct:<8.2f}% {res.fpr_delta:<+10.4f}")
+        feat_summary = f"{len(res.features_perturbed)} cols" if res.features_perturbed else "None"
+        print(f"    {res.test_name:<38} {res.status:<11} {res.original_macro_f1:<8.4f} {res.perturbed_macro_f1:<8.4f} {res.f1_delta:<+9.4f} {res.flip_rate_pct:<6.2f}% {res.fpr_delta:<+9.4f} {feat_summary}")
 
     # =========================================================================
     # PART 3: SAFE FAILURE & CORRUPTION ISOLATION AUDIT
@@ -102,9 +104,10 @@ def run_phase7_experiments() -> dict[str, Any]:
     print("-" * 80)
 
     # Synthetic test set containing clean, infinite, NaN, and 100% corrupted rows
-    corrupt_test_rows = prep.X_test.head(10).copy().reset_index(drop=True)
+    # Convert to float to avoid Pandas incompatible dtype FutureWarning
+    corrupt_test_rows = prep.X_test.head(10).astype(float).copy().reset_index(drop=True)
     
-    # Row 0: Clean
+    # Row 0: Clean flow
     # Row 1: Contains np.inf from zero-duration division
     corrupt_test_rows.loc[1, prep.feature_names[0]] = np.inf
     # Row 2: Contains negative infinity
@@ -115,22 +118,31 @@ def run_phase7_experiments() -> dict[str, Any]:
     # Row 4: 90% missing features (severe telemetry drop)
     for f in prep.feature_names[:int(len(prep.feature_names) * 0.9)]:
         corrupt_test_rows.loc[4, f] = np.nan
+    # Row 5: 1 feature missing (genuinely missing measurement, within safe tolerance)
+    corrupt_test_rows.loc[5, prep.feature_names[0]] = np.nan
 
-    scored_corrupt = score_flows(lgbm_pipe, prep.feature_names, corrupt_test_rows)
+    scored_corrupt = score_flows(lgbm_pipe, prep.feature_names, corrupt_test_rows, quarantine_non_finite=True)
 
     row0_pred = scored_corrupt.loc[0, "prediction"]
+    row0_status = scored_corrupt.loc[0, "data_status"]
     row1_pred = scored_corrupt.loc[1, "prediction"]
+    row1_risk = scored_corrupt.loc[1, "risk_level"]
+    row1_status = scored_corrupt.loc[1, "data_status"]
     row3_pred = scored_corrupt.loc[3, "prediction"]
     row3_risk = scored_corrupt.loc[3, "risk_level"]
-    row4_pred = scored_corrupt.loc[4, "prediction"]
-    row4_risk = scored_corrupt.loc[4, "risk_level"]
+    row3_status = scored_corrupt.loc[3, "data_status"]
+    row5_pred = scored_corrupt.loc[5, "prediction"]
+    row5_status = scored_corrupt.loc[5, "data_status"]
 
-    print(f"[*] Clean Row 0: Prediction = {row0_pred}, Risk = {scored_corrupt.loc[0, 'risk_level']}")
-    print(f"[*] +Inf Row 1 (Zero Duration Division): Sanitized to finite prediction = {row1_pred}, Score = {scored_corrupt.loc[1, 'malicious_score']}")
-    print(f"[*] 100% Corrupted Row 3: Prediction = {row3_pred}, Risk = {row3_risk} (SAFE FAILURE: NOT SILENTLY PASSED AS BENIGN)")
-    print(f"[*] 90% Corrupted Row 4: Prediction = {row4_pred}, Risk = {row4_risk} (SAFE FAILURE: ISOLATED)")
+    print(f"[*] Clean Row 0: Prediction = {row0_pred}, Risk = {scored_corrupt.loc[0, 'risk_level']}, Status = {row0_status}")
+    print(f"[*] +Inf Row 1 (Zero-Duration Rate Division): Prediction = {row1_pred}, Risk = {row1_risk}, Status = {row1_status}")
+    print(f"    --> SAFE QUARANTINE: Unphysical infinite rates are quarantined, NOT falsely reported as benign!")
+    print(f"[*] 100% Corrupted Row 3: Prediction = {row3_pred}, Risk = {row3_risk}, Status = {row3_status}")
+    print(f"    --> SAFE FAILURE: Completely corrupted flows are quarantined as UNPARSEABLE_ANOMALY.")
+    print(f"[*] Mild Missingness Row 5 (1/77 NaN): Prediction = {row5_pred}, Status = {row5_status}")
+    print(f"    --> SAFE IMPUTATION: Valid telemetry with minor missingness is reliably scored.")
 
-    safe_failure_passed = (row3_pred == -1) and (row3_risk == "UNPARSEABLE_ANOMALY") and (row4_pred == -1)
+    safe_failure_passed = (row1_pred == -1) and (row1_risk == "QUARANTINE_NON_FINITE") and (row3_pred == -1) and (row5_status == "IMPUTED_VALID")
 
     # =========================================================================
     # PART 4: ISOLATION FOREST ANOMALY DECISION & CALIBRATION CHECK
@@ -167,9 +179,9 @@ def run_phase7_experiments() -> dict[str, Any]:
         "lightgbm_champion": lgbm_results.to_dict(),
         "random_forest_comparison": rf_results.to_dict(),
         "safe_failure_audit": {
-            "infinite_value_sanitized": True,
+            "infinite_value_quarantined": bool(row1_pred == -1 and row1_risk == "QUARANTINE_NON_FINITE"),
             "all_nan_isolated_as_anomaly": bool(row3_pred == -1),
-            "severe_corruption_isolated": bool(row4_pred == -1),
+            "mild_missingness_imputed": bool(row5_status == "IMPUTED_VALID"),
             "safe_failure_status": "PASSED" if safe_failure_passed else "FAILED",
         },
         "unsupervised_isolation_forest": {

@@ -84,19 +84,37 @@ class Phase7SecurityAndRobustnessTests(unittest.TestCase):
         with self.assertRaises(SchemaMismatchError):
             score_flows(self.pipe, self.prep.feature_names, bad_df)
 
-    def test_infinite_values_sanitized_during_scoring(self):
-        """Verify that +/- Inf from 0-duration division are sanitized to finite values."""
-        corrupt_df = self.prep.X_test.copy().reset_index(drop=True)
+    def test_infinite_values_quarantined_not_benign(self):
+        """Verify that +/- Inf from 0-duration rate division are quarantined, not reported as benign."""
+        corrupt_df = self.prep.X_test.astype(float).copy().reset_index(drop=True)
         corrupt_df.loc[0, self.prep.feature_names[0]] = np.inf
         corrupt_df.loc[1, self.prep.feature_names[1]] = -np.inf
         
+        # Default policy: quarantine invalid non-finite records
         scored = score_flows(self.pipe, self.prep.feature_names, corrupt_df)
+        self.assertEqual(scored.loc[0, "prediction"], -1)
+        self.assertEqual(scored.loc[0, "risk_level"], "QUARANTINE_NON_FINITE")
+        self.assertEqual(scored.loc[0, "data_status"], "INVALID_NON_FINITE")
+        self.assertTrue(np.isnan(scored.loc[0, "malicious_score"]))
+
+        # Optional backwards-compatible imputation mode
+        scored_imputed = score_flows(self.pipe, self.prep.feature_names, corrupt_df, quarantine_non_finite=False)
+        self.assertTrue(np.isfinite(scored_imputed.loc[0, "malicious_score"]))
+        self.assertEqual(scored_imputed.loc[0, "data_status"], "NON_FINITE_IMPUTED")
+
+    def test_mild_missingness_allowed_normal_imputation(self):
+        """Verify that a single missing feature within safe tolerance is imputed and scored normally."""
+        missing_df = self.prep.X_test.astype(float).copy().reset_index(drop=True)
+        missing_df.loc[0, self.prep.feature_names[0]] = np.nan
+
+        scored = score_flows(self.pipe, self.prep.feature_names, missing_df)
+        self.assertIn(scored.loc[0, "prediction"], [0, 1])
+        self.assertEqual(scored.loc[0, "data_status"], "IMPUTED_VALID")
         self.assertTrue(np.isfinite(scored.loc[0, "malicious_score"]))
-        self.assertTrue(np.isfinite(scored.loc[1, "malicious_score"]))
 
     def test_severe_corruption_isolated_as_unparseable(self):
         """Verify that rows with >80% corrupt/NaN features fail safely as UNPARSEABLE_ANOMALY."""
-        corrupt_df = self.prep.X_test.copy().reset_index(drop=True)
+        corrupt_df = self.prep.X_test.astype(float).copy().reset_index(drop=True)
         # Corrupt 100% of features in row 2
         for f in self.prep.feature_names:
             corrupt_df.loc[2, f] = np.nan
@@ -104,6 +122,7 @@ class Phase7SecurityAndRobustnessTests(unittest.TestCase):
         scored = score_flows(self.pipe, self.prep.feature_names, corrupt_df)
         self.assertEqual(scored.loc[2, "prediction"], -1)
         self.assertEqual(scored.loc[2, "risk_level"], "UNPARSEABLE_ANOMALY")
+        self.assertEqual(scored.loc[2, "data_status"], "CORRUPT_EXCESSIVE_MISSING")
         self.assertTrue(np.isnan(scored.loc[2, "malicious_score"]))
 
     def test_isolation_forest_inlier_outlier_prediction_consistency(self):
@@ -190,8 +209,9 @@ class Phase7SecurityAndRobustnessTests(unittest.TestCase):
     def test_gaussian_noise_preserves_physical_positivity(self):
         """Verify that measurement noise maintains non-negative values for network rates."""
         X_orig = self.prep.X_test.copy()
-        X_pert = apply_gaussian_measurement_noise(X_orig, noise_pct=0.15, random_state=42)
+        X_pert, cols = apply_gaussian_measurement_noise(X_orig, noise_pct=0.15, random_state=42)
         
+        self.assertGreater(len(cols), 0)
         # All non-negative features must remain >= 0
         for col in X_pert.select_dtypes(include=[np.number]).columns:
             self.assertTrue((X_pert[col] >= 0).all())
@@ -199,20 +219,56 @@ class Phase7SecurityAndRobustnessTests(unittest.TestCase):
     def test_missing_feature_injection_preserves_shape(self):
         """Verify that missing feature injection maintains matrix dimensions and creates NaNs."""
         X_orig = self.prep.X_test.copy()
-        X_drop = apply_missing_feature_injection(X_orig, missing_ratio=0.20, random_state=42)
+        X_drop, cols = apply_missing_feature_injection(X_orig, missing_ratio=0.20, random_state=42)
         self.assertEqual(X_orig.shape, X_drop.shape)
         self.assertGreater(X_drop.isna().sum().sum(), 0)
 
-    def test_adversarial_pacing_attenuation(self):
+    def test_adversarial_pacing_attenuation_and_column_verification(self):
         """Verify that rate pacing increases duration and reduces packets per second."""
         X_orig = self.prep.X_test.copy()
-        X_paced = apply_adversarial_pacing(X_orig, pace_factor=10.0)
+        X_paced, cols = apply_adversarial_pacing(X_orig, pace_factor=10.0)
         
+        self.assertGreater(len(cols), 0)
+        self.assertFalse(X_paced[cols].equals(X_orig[cols]))
         if "flow_duration_ms" in X_paced.columns:
             self.assertTrue((X_paced["flow_duration_ms"] >= X_orig["flow_duration_ms"]).all())
         if "flow_packets_per_second" in X_paced.columns:
             self.assertTrue((X_paced["flow_packets_per_second"] <= X_orig["flow_packets_per_second"]).all())
 
+    def test_jumbo_frame_and_line_rate_modifies_features(self):
+        """Verify that extreme valid stress modifies target features and changes input."""
+        from netsentry.research.robustness import apply_extreme_valid_stress
+        X_orig = self.prep.X_test.copy()
+        
+        # Jumbo frames
+        X_jumbo, j_cols = apply_extreme_valid_stress(X_orig, "jumbo_frames")
+        self.assertGreater(len(j_cols), 0)
+        self.assertFalse(X_jumbo[j_cols].equals(X_orig[j_cols]))
+
+        # Line-rate 100G
+        X_100g, r_cols = apply_extreme_valid_stress(X_orig, "line_rate_100g")
+        self.assertGreater(len(r_cols), 0)
+        self.assertFalse(X_100g[r_cols].equals(X_orig[r_cols]))
+
+    def test_unsupported_perturbation_handled_safely(self):
+        """Verify that when target features are absent, perturbation is marked UNSUPPORTED, not immune."""
+        from netsentry.research.robustness import evaluate_single_perturbation
+        # Synthetic DataFrame with unrelated column names
+        dummy_df = pd.DataFrame({"dummy_a": [1.0, 2.0], "dummy_b": [3.0, 4.0]})
+        y_dummy = pd.Series([0, 1])
+        
+        res = evaluate_single_perturbation(
+            self.pipe, dummy_df, dummy_df, y_dummy,
+            test_name="Dummy Test",
+            category="extreme_values",
+            description="Testing unsupported features",
+            features_perturbed=[],  # No matching features found
+        )
+        self.assertEqual(res.status, "UNSUPPORTED")
+        self.assertFalse(res.transformation_verified)
+        self.assertIn("UNSUPPORTED", res.description)
+
 
 if __name__ == "__main__":
     unittest.main()
+

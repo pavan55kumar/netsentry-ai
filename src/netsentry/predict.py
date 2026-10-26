@@ -35,8 +35,19 @@ def score_flows(
     frame: pd.DataFrame,
     threshold: float = 0.5,
     max_corrupt_ratio: float = 0.8,
+    quarantine_non_finite: bool = True,
 ) -> pd.DataFrame:
-    """Score flow records and enrich with probabilities and risk classifications.
+    """Score flow records and enrich with probabilities, risk tiers, and data quality status.
+
+    Safety & Quarantine Policy:
+        - CLEAN: All expected features are finite and present. Scored normally.
+        - IMPUTED_VALID: Minor missingness (<= max_corrupt_ratio) without non-finite values.
+          Imputed with training statistics and scored.
+        - INVALID_NON_FINITE: Contains +inf or -inf (e.g. from 0-duration rate division).
+          Unphysical measurements are quarantined (prediction=-1, risk_level='QUARANTINE_NON_FINITE')
+          rather than silently imputed and presented as benign traffic.
+        - CORRUPT_EXCESSIVE_MISSING: Severe missingness (> max_corrupt_ratio).
+          Quarantined as UNPARSEABLE_ANOMALY.
 
     Args:
         model: Fitted pipeline or estimator.
@@ -44,11 +55,12 @@ def score_flows(
         frame: Input DataFrame containing flow columns.
         threshold: Decision threshold for positive malicious class.
         max_corrupt_ratio: Maximum proportion of missing/corrupt values allowed
-            before a flow is flagged as UNPARSEABLE_ANOMALY rather than silently
-            imputed as benign.
+            before a flow is flagged as UNPARSEABLE_ANOMALY.
+        quarantine_non_finite: If True (default), flows containing +inf/-inf are quarantined
+            with prediction=-1 rather than silently converted to median benign flows.
 
     Returns:
-        DataFrame with predictions, scores, and risk tiers appended.
+        DataFrame with predictions, scores, risk tiers, and data_status appended.
     """
     if not isinstance(frame, pd.DataFrame):
         raise TypeError(f"Expected pandas DataFrame for 'frame', got {type(frame).__name__}")
@@ -60,6 +72,7 @@ def score_flows(
         result["prediction"] = pd.Series(dtype=int)
         result["risk_level"] = pd.Series(dtype=str)
         result["malicious_score"] = pd.Series(dtype=float)
+        result["data_status"] = pd.Series(dtype=str)
         return result
 
     # Check for missing expected features
@@ -67,15 +80,37 @@ def score_flows(
     if missing:
         raise SchemaMismatchError("Input is missing trained feature columns: " + ", ".join(missing))
 
-    # Convert numeric features, safely replacing inf/-inf with NaN
+    # Convert numeric features
     X_raw = frame[list(expected_features)].apply(pd.to_numeric, errors="coerce")
+
+    # Detect non-finite values (+inf, -inf) before replacement
+    is_non_finite = np.isinf(X_raw).any(axis=1)
+
+    # Convert infinities to NaN for statistical handling
     X = X_raw.replace([np.inf, -np.inf], np.nan)
 
-    # Detect severely corrupted or unparseable rows
-    # A flow with > max_corrupt_ratio corrupted values must never be silently reported as normal
+    # Detect missingness ratio
     nan_ratio = X.isna().mean(axis=1)
-    corrupt_mask = nan_ratio > max_corrupt_ratio
-    valid_mask = ~corrupt_mask
+    is_excessive_missing = nan_ratio > max_corrupt_ratio
+
+    # Enforce Quarantine Safety Policy
+    if quarantine_non_finite:
+        quarantine_mask = is_non_finite | is_excessive_missing
+    else:
+        quarantine_mask = is_excessive_missing
+
+    valid_mask = ~quarantine_mask
+
+    # Assign structured data_status column
+    data_status = pd.Series("CLEAN", index=result.index, dtype=object)
+    mild_missing = (X.isna().any(axis=1)) & valid_mask
+    data_status[mild_missing] = "IMPUTED_VALID"
+    if is_non_finite.any():
+        data_status[is_non_finite] = "INVALID_NON_FINITE" if quarantine_non_finite else "NON_FINITE_IMPUTED"
+    if is_excessive_missing.any():
+        data_status[is_excessive_missing] = "CORRUPT_EXCESSIVE_MISSING"
+
+    result["data_status"] = data_status
 
     # Detect if model is an unsupervised anomaly detector (e.g. Isolation Forest)
     is_isolation_forest = False
@@ -136,16 +171,25 @@ def score_flows(
             result.loc[valid_mask, "prediction"] = preds
             result.loc[valid_mask, "risk_level"] = np.where(preds == 1, "HIGH", "LOW")
 
-    # Safe failure isolation: flag corrupted rows rather than silently passing as benign
-    if corrupt_mask.any():
-        result.loc[corrupt_mask, "prediction"] = -1
-        result.loc[corrupt_mask, "risk_level"] = "UNPARSEABLE_ANOMALY"
+    # Safe failure isolation: flag quarantined rows rather than silently passing as benign
+    if is_non_finite.any() and quarantine_non_finite:
+        result.loc[is_non_finite, "prediction"] = -1
+        result.loc[is_non_finite, "risk_level"] = "QUARANTINE_NON_FINITE"
         if "malicious_score" in result.columns:
-            result.loc[corrupt_mask, "malicious_score"] = np.nan
+            result.loc[is_non_finite, "malicious_score"] = np.nan
         if "anomaly_score" in result.columns:
-            result.loc[corrupt_mask, "anomaly_score"] = np.nan
+            result.loc[is_non_finite, "anomaly_score"] = np.nan
+
+    if is_excessive_missing.any():
+        result.loc[is_excessive_missing, "prediction"] = -1
+        result.loc[is_excessive_missing, "risk_level"] = "UNPARSEABLE_ANOMALY"
+        if "malicious_score" in result.columns:
+            result.loc[is_excessive_missing, "malicious_score"] = np.nan
+        if "anomaly_score" in result.columns:
+            result.loc[is_excessive_missing, "anomaly_score"] = np.nan
 
     return result
+
 
 
 def main() -> None:
