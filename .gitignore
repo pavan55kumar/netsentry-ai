@@ -1,9 +1,29 @@
+# Virtual environments & test sandboxes
 .venv/
+.verify-venv/
+.verify-314/
+.local-temp/
+
+# Python bytecode & package metadata
 __pycache__/
 *.py[cod]
-artifacts/
-data/real/
-.pytest_cache/
-.verify-venv/
-.local-temp/
 *.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+*.log
+
+# Experiment artifacts & temporary run folders
+artifacts/
+
+# Sensitive environment variables & secrets
+.env
+.env.*
+secrets.toml
+
+# Private captures & large raw datasets
+data/real/
+data/captures/
+data/private/
+*.pcapng

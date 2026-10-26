@@ -32,19 +32,32 @@ def generate_security_narrative(
     Returns:
         Dictionary containing summary, findings, technical breakdown, and limitations.
     """
-    is_malicious = explanation.predicted_name.lower() not in {"benign", "normal", "0"}
+    is_quarantined = explanation.predicted_label == -1 or explanation.predicted_name in {"QUARANTINE_NON_FINITE", "UNPARSEABLE_ANOMALY"}
+    is_malicious = (not is_quarantined) and explanation.predicted_name.lower() not in {"benign", "normal", "0"}
     conf = explanation.confidence_score
 
     # Probability calibration honesty
     score_desc = (
-        f"calibrated probability of {conf * 100:.1f}%"
+        "QUARANTINED (Model prediction safely suppressed)"
+        if is_quarantined
+        else f"calibrated probability of {conf * 100:.1f}%"
         if is_calibrated and conf is not None
         else f"uncalibrated model score of {conf * 100:.1f}%"
         if conf is not None
         else "binary classification"
     )
 
-    if not is_malicious:
+    if is_quarantined:
+        summary = (
+            f"Flow [{explanation.flow_id}] was placed into structured QUARANTINE ({explanation.predicted_name}). "
+            f"The connection features contain unphysical non-finite values (such as +/- Inf from zero-duration rate calculations) "
+            f"or excessive missing telemetry (>80%). Under NetSentry AI Safe Failure Policy, automated classification was safely "
+            f"suppressed to eliminate the silent benign failure vulnerability."
+        )
+        recommendation = (
+            "Quarantine connection. Conduct manual SOC forensic analysis on endpoint telemetry and verify flow meter exporter health."
+        )
+    elif not is_malicious:
         summary = (
             f"Flow [{explanation.flow_id}] was classified as {explanation.predicted_name.upper()} "
             f"with an {score_desc}. All observed connection metrics fall within "

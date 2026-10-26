@@ -1,0 +1,116 @@
+{
+  "benchmark_metadata": {
+    "version": "Phase 8.0 Final",
+    "total_benchmark_duration_seconds": 60.13,
+    "peak_memory_mb": 51.74
+  },
+  "system_environment": {
+    "os_name": "Windows",
+    "os_release": "11",
+    "os_version": "10.0.26300",
+    "machine": "AMD64",
+    "processor": "AMD64 Family 23 Model 96 Stepping 1, AuthenticAMD",
+    "cpu_count_logical": 16,
+    "total_ram": "Unknown",
+    "python_version": "3.12.3",
+    "python_executable": "C:\\Users\\ASUS\\Documents\\Codex\\2026-10-25\\referenced-chatgpt-conversation-this-is-an\\outputs\\netsentry-ai\\.venv\\Scripts\\python.exe",
+    "scikit_learn_version": "1.9.1",
+    "pandas_version": "2.3.3",
+    "numpy_version": "2.5.4",
+    "benchmark_timestamp": "2026-10-26T08:18:53Z"
+  },
+  "model_loading_benchmark": {
+    "model_file": "best_model.joblib",
+    "file_size_bytes": 1943186,
+    "file_size_kb": 1897.64,
+    "file_size_mb": 1.853,
+    "iterations": 20,
+    "mean_load_time_ms": 127.519,
+    "std_load_time_ms": 119.78,
+    "min_load_time_ms": 66.531,
+    "max_load_time_ms": 633.187
+  },
+  "csv_ingestion_benchmark": [
+    {
+      "n_samples": 500,
+      "n_columns": 9,
+      "csv_file_size_kb": 30.21,
+      "in_memory_dataframe_kb": 58.65,
+      "load_duration_ms": 16.059,
+      "schema_validation_duration_ms": 24.193,
+      "total_ingest_and_validate_ms": 40.251,
+      "throughput_flows_per_second": 12421.9
+    },
+    {
+      "n_samples": 1000,
+      "n_columns": 9,
+      "csv_file_size_kb": 60.01,
+      "in_memory_dataframe_kb": 117.19,
+      "load_duration_ms": 13.146,
+      "schema_validation_duration_ms": 28.647,
+      "total_ingest_and_validate_ms": 41.793,
+      "throughput_flows_per_second": 23927.5
+    },
+    {
+      "n_samples": 5000,
+      "n_columns": 9,
+      "csv_file_size_kb": 299.3,
+      "in_memory_dataframe_kb": 585.41,
+      "load_duration_ms": 23.402,
+      "schema_validation_duration_ms": 27.571,
+      "total_ingest_and_validate_ms": 50.973,
+      "throughput_flows_per_second": 98091.3
+    }
+  ],
+  "inference_latency_benchmark": {
+    "single_flow_latency_ms": {
+      "iterations": 500,
+      "mean": 72.7697,
+      "std": 14.5814,
+      "median": 70.1594,
+      "p95": 92.3146,
+      "p99": 139.3224,
+      "min": 56.2481,
+      "max": 197.2327
+    },
+    "batch_inference_throughput": {
+      "batch_100": {
+        "batch_size": 100,
+        "mean_batch_time_ms": 77.488,
+        "p95_batch_time_ms": 83.707,
+        "throughput_flows_per_second": 1290.5
+      },
+      "batch_500": {
+        "batch_size": 500,
+        "mean_batch_time_ms": 89.354,
+        "p95_batch_time_ms": 97.15,
+        "throughput_flows_per_second": 5595.7
+      },
+      "batch_1000": {
+        "batch_size": 1000,
+        "mean_batch_time_ms": 99.736,
+        "p95_batch_time_ms": 108.242,
+        "throughput_flows_per_second": 10026.5
+      }
+    }
+  },
+  "pcap_extraction_benchmark": {
+    "pcap_file": "test_traffic.pcap",
+    "file_size_bytes": 632,
+    "total_packets_read": 8,
+    "total_flows_extracted": 3,
+    "iterations": 5,
+    "mean_parse_duration_ms": 459.996,
+    "min_parse_duration_ms": 10.366,
+    "max_parse_duration_ms": 2254.886,
+    "packets_per_second": 17.4,
+    "disclaimer": "Scapy operates in user-space Python and is suitable for offline PCAP forensics; live line-rate 10G/100G requires kernel-bypass NIC drivers (DPDK/AF_PACKET) and hardware meters."
+  },
+  "safe_failure_overhead_benchmark": {
+    "batch_size": 500,
+    "clean_scoring_duration_ms": 95.281,
+    "quarantine_scoring_duration_ms": 101.318,
+    "quarantined_flows_count": 25,
+    "overhead_pct": 6.34
+  }
+}

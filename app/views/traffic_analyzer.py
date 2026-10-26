@@ -13,11 +13,13 @@ try:
     from netsentry.explainability.local_explainer import explain_single_flow
     from netsentry.explainability.narrative import generate_security_narrative
     from netsentry.pcap.flow_extractor import extract_flows_from_pcap
+    from netsentry.utils.logging import redact_ip_address
 except ImportError:
     from src.netsentry.predict import score_flows
     from src.netsentry.explainability.local_explainer import explain_single_flow
     from src.netsentry.explainability.narrative import generate_security_narrative
     from src.netsentry.pcap.flow_extractor import extract_flows_from_pcap
+    from src.netsentry.utils.logging import redact_ip_address
 
 from ..styles import render_badge, render_kpi
 
@@ -159,9 +161,10 @@ def render_traffic_analyzer_view():
 
     critical_count = int((scored_df.get("risk_level", "") == "CRITICAL").sum())
     high_count = int((scored_df.get("risk_level", "") == "HIGH").sum())
+    quarantined_count = int((scored_df.get("prediction", 0) == -1).sum())
 
-    # Summary KPI Bar
-    k1, k2, k3, k4 = st.columns(4)
+    # Summary KPI Bar (5 columns)
+    k1, k2, k3, k4, k5 = st.columns(5)
     with k1:
         st.markdown(render_kpi("Total Flows Scored", f"{total_flows:,}", "Active Stream", "#38bdf8"), unsafe_allow_html=True)
     with k2:
@@ -169,20 +172,23 @@ def render_traffic_analyzer_view():
     with k3:
         st.markdown(render_kpi("Critical Risk", f"{critical_count:,}", "Immediate Escalation", "#f43f5e"), unsafe_allow_html=True)
     with k4:
-        st.markdown(render_kpi("High Risk", f"{high_count:,}", "Requires Analyst Review", "#f59e0b"), unsafe_allow_html=True)
+        st.markdown(render_kpi("High Risk", f"{high_count:,}", "Requires SOC Review", "#f59e0b"), unsafe_allow_html=True)
+    with k5:
+        st.markdown(render_kpi("Quarantined", f"{quarantined_count:,}", "Invalid / Non-Finite", "#ec4899" if quarantined_count > 0 else "#10b981"), unsafe_allow_html=True)
 
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
 
     st.info(
         "🛡️ **Score Interpretation & Methodology Notice:** The displayed prediction reflects statistical similarity to known training attack patterns. "
         "Confidence scores from supervised pipelines represent estimated class probabilities; they do **not** constitute absolute proof of malicious intent. "
-        "For unsupervised anomaly models, scores represent relative geometric outlier distance and must not be interpreted as calibrated probabilities."
+        "For unsupervised anomaly models, scores represent relative geometric outlier distance and must not be interpreted as calibrated probabilities. "
+        "Quarantined records (-1) represent non-finite inputs or severe corruptions safely isolated to avoid false benign classifications."
     )
 
     # Filtering
     filter_choice = st.radio(
         "Filter View",
-        ["All Flows", "Flagged Malicious Only", "Critical & High Risk Only"],
+        ["All Flows", "Flagged Malicious Only", "Critical & High Risk Only", "Quarantined / Invalid Only"],
         horizontal=True,
     )
 
@@ -190,6 +196,8 @@ def render_traffic_analyzer_view():
         display_df = scored_df[scored_df["prediction"] == 1]
     elif filter_choice == "Critical & High Risk Only":
         display_df = scored_df[scored_df["risk_level"].isin(["CRITICAL", "HIGH"])]
+    elif filter_choice == "Quarantined / Invalid Only":
+        display_df = scored_df[scored_df["prediction"] == -1]
     else:
         display_df = scored_df
 
@@ -197,14 +205,23 @@ def render_traffic_analyzer_view():
     st.dataframe(display_df.head(200), use_container_width=True)
     st.caption(f"Displaying {len(display_df):,} of {total_flows:,} flows.")
 
-    # Export Scored Data
-    csv_bytes = scored_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "📥 Export Scored Telemetry to CSV",
-        data=csv_bytes,
-        file_name="netsentry_scored_traffic.csv",
-        mime="text/csv",
-    )
+    # Export Scored Data with Privacy Option
+    exp_col1, exp_col2 = st.columns([1, 2])
+    with exp_col1:
+        mask_ips = st.checkbox("🔒 Privacy Masking (Redact IP Host Octets)", value=True, help="Replaces IPv4 host octets with *** (e.g. 192.168.1.***) for privacy-compliant export.")
+    with exp_col2:
+        export_copy = scored_df.copy()
+        if mask_ips:
+            for ip_col in ["src_ip", "dst_ip", "source_ip", "destination_ip"]:
+                if ip_col in export_copy.columns:
+                    export_copy[ip_col] = export_copy[ip_col].astype(str).apply(redact_ip_address)
+        csv_bytes = export_copy.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "📥 Export Scored Telemetry to CSV",
+            data=csv_bytes,
+            file_name="netsentry_scored_traffic.csv",
+            mime="text/csv",
+        )
 
     st.markdown("---")
 

@@ -65,7 +65,7 @@ def main():
             f"""
             <div style="display: flex; flex-direction: column; gap: 0.4rem;">
                 <div>Engine: {render_badge("ONLINE", "safe")}</div>
-                <div>Telemetry: {render_badge("10 Gbit Active", "info")}</div>
+                <div>Flow Ingestion: {render_badge("PCAP & Flow CSV", "info")}</div>
                 <div>Leakage Guard: {render_badge("ENFORCED", "safe")}</div>
             </div>
             """,

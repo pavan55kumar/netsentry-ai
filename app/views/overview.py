@@ -95,7 +95,7 @@ def render_overview_view():
     with kpi4:
         lat_val = holdout.get("inference_latency_ms", 0.0)
         st.markdown(
-            render_kpi("Inference Latency", f"{lat_val:.3f} ms", f"{int(1000 / max(lat_val, 0.001)):,} flows/sec wire speed", "#a855f7"),
+            render_kpi("Inference Latency", f"{lat_val:.3f} ms", f"{int(1000 / max(lat_val, 0.001)):,} flows/sec local batch", "#a855f7"),
             unsafe_allow_html=True,
         )
 

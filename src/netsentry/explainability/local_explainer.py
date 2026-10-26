@@ -77,7 +77,54 @@ def explain_single_flow(
     features = list(X_background.columns)
     flow_clean = flow_df[features].apply(pd.to_numeric, errors="coerce")
 
-    # Predict
+    # Check for non-finite values (+/- Inf) or severe missingness (>80%)
+    is_non_finite = bool(flow_clean.isin([np.inf, -np.inf]).any().any())
+    missing_ratio = float(flow_clean.isna().sum().sum()) / max(len(features), 1)
+    is_severe_corrupt = missing_ratio > 0.80
+    pre_pred = getattr(flow_row, "get", lambda k, d=None: d)("prediction", None)
+    is_pre_quarantined = pre_pred == -1 or getattr(flow_row, "get", lambda k, d=None: d)("data_status", "") in {"INVALID_NON_FINITE", "CORRUPT_EXCESSIVE_MISSING"}
+
+    if is_non_finite or is_severe_corrupt or is_pre_quarantined:
+        status_name = "QUARANTINE_NON_FINITE" if is_non_finite else "UNPARSEABLE_ANOMALY"
+        bg_clean = X_background[features].apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan)
+        medians = bg_clean.median()
+        stds = bg_clean.std().replace(0, 1.0).fillna(1.0)
+        
+        problematic_feats = []
+        raw_dict = {}
+        median_dict = {}
+        deviations = {}
+        for f in features:
+            v = flow_clean[f].iloc[0]
+            med = float(medians[f]) if f in medians else 0.0
+            median_dict[f] = med
+            if np.isinf(v):
+                raw_dict[f] = 999999.0
+                deviations[f] = 99.0
+                problematic_feats.append({"feature": f, "observed": "+Infinity" if v > 0 else "-Infinity", "normal_median": round(med, 3), "z_score": 99.0, "diff_ratio": 99.0})
+            elif np.isnan(v):
+                raw_dict[f] = 0.0
+                deviations[f] = 0.0
+                if is_severe_corrupt:
+                    problematic_feats.append({"feature": f, "observed": "Missing (NaN)", "normal_median": round(med, 3), "z_score": 0.0, "diff_ratio": 0.0})
+            else:
+                raw_dict[f] = float(v)
+                s = float(stds[f]) if f in stds else 1.0
+                deviations[f] = round((float(v) - med) / s, 2)
+
+        return LocalFlowExplanation(
+            flow_id=flow_id,
+            predicted_label=-1,
+            predicted_name=status_name,
+            confidence_score=None,
+            raw_values=raw_dict,
+            normal_medians=median_dict,
+            deviations=deviations,
+            top_pushing_attack=problematic_feats[:4],
+            top_pushing_benign=[],
+        )
+
+    # Predict normal valid flow
     pred_idx = int(pipeline.predict(flow_clean)[0])
     prob: float | None = None
     if hasattr(pipeline, "predict_proba"):
@@ -90,8 +137,9 @@ def explain_single_flow(
         pred_name = "Malicious" if pred_idx == 1 else "Benign"
 
     # Compute baseline statistics
-    medians = X_background[features].median()
-    stds = X_background[features].std().replace(0, 1.0).fillna(1.0)
+    bg_clean = X_background[features].apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan)
+    medians = bg_clean.median()
+    stds = bg_clean.std().replace(0, 1.0).fillna(1.0)
 
     raw_dict = {f: float(flow_clean[f].iloc[0]) for f in features}
     median_dict = {f: float(medians[f]) for f in features}
