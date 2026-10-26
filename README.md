@@ -135,6 +135,18 @@ Open your browser to `http://localhost:8501`.
 
 ---
 
+## 🌐 Deployment Modalities: Local vs GitHub vs Cloud
+
+It is essential to understand the distinction between running the code locally, hosting the repository on GitHub, and hosting a live public web demo:
+
+| Deployment Modality | Platform / Location | Status in Project | How It Works |
+| :--- | :--- | :--- | :--- |
+| **1. Local Execution** | Local PC (`localhost:8501`) | **Active & Verified** | Full functionality: offline PCAP flow extraction, model training, live CSV scoring, and local explainability. |
+| **2. GitHub Source Hosting** | [GitHub Repo](https://github.com/pavan55kumar/netsentry-ai) | **Active & Verified** | Archives versioned source code, 63 regression tests, Phase 1–10 tags, and research documentation for portfolio inspection. *Note: Pushing to GitHub does not host a live running server.* |
+| **3. Cloud Web App Deployment** | Streamlit Community Cloud | **Optional Step** | Hosts an interactive public URL (e.g. `https://netsentry-ai.streamlit.app`) for recruiters. Connect your GitHub repo at [share.streamlit.io](https://share.streamlit.io) with entry point `app/main.py`. |
+
+---
+
 ## 🚀 Running Analysis & Packet Ingestion
 
 ### A. Real-Time CSV Flow Scoring (CLI)
