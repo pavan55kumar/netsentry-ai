@@ -1,193 +1,226 @@
-# NetSentry AI — Advanced ML Research Platform & Cybersecurity Operations Center
+# NetSentry AI — Machine Learning Network Intrusion Detection & Research Platform
 
-[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Streamlit UI](https://img.shields.io/badge/Streamlit-v2.0-FF4B4B.svg)](https://streamlit.io/)
-[![Tests Passing](https://img.shields.io/badge/Tests-22%2F22%20Passing-brightgreen.svg)]()
-[![Authentic Datasets](https://img.shields.io/badge/Datasets-CIC--IDS2017%20%7C%20UNSW--NB15-blueviolet.svg)]()
+[![Streamlit UI](https://img.shields.io/badge/Streamlit-v1.34-FF4B4B.svg)](https://streamlit.io/)
+[![Tests Passing](https://img.shields.io/badge/Tests-63%2F63%20Passing-brightgreen.svg)]()
+[![Datasets](https://img.shields.io/badge/Datasets-CIC--IDS2017%20%7C%20UNSW--NB15-blueviolet.svg)]()
+[![Audit Status](https://img.shields.io/badge/Phase%209%20Audit-Verified-success.svg)]()
 
-> **NetSentry AI** is a production-grade Network Intrusion Detection (NIDS) and academic research experimentation platform bridging **Data Communication & Networking (DCN)** with **Machine Learning (ML)** engineering. NetSentry AI analyzes bidirectional network connection flows (NetFlow / IPFIX) to detect cyberattacks across TLS 1.3 encrypted streams at line rate without payload inspection.
-
----
-
-## 🚀 Key Highlights & Architectural Features
-
-- **11 Machine Learning Algorithms Across 6 Paradigms:**
-  - *Boosting Ensembles*: LightGBM, XGBoost, HistGradientBoosting
-  - *Bagging Ensembles*: Random Forest (500 trees), Extra Trees (500 trees)
-  - *Rule-Based Trees*: Decision Tree (CART)
-  - *Linear Models*: Logistic Regression, Support Vector Machine (Linear SVC with Platt calibration)
-  - *Instance-Based & Neural*: K-Nearest Neighbors (RobustScaler), Multi-Layer Perceptron (MLP Neural Network)
-  - *Unsupervised Anomaly Detection*: Isolation Forest
-- **Zero-Leakage Training Pipelines:** Imputation, standard/robust scaling, and hyperparameter tuning occur strictly inside cross-validation training folds. Holdout test sets remain 100% untouched until final evaluation.
-- **Authentic Network Datasets:** Validated on Canadian Institute for Cybersecurity **CIC-IDS2017** and Australian Centre for Cyber Security **UNSW-NB15** with documented SHA-256 provenance.
-- **The Accuracy Trap & Alert Fatigue Mitigation:** Automatically computes majority Zero-R baselines and sweeps decision thresholds ($\tau \in [0.05, 0.95]$) to enforce strict operational False Positive Rate limits ($\text{FPR} < 1.0\%$).
-- **Offline PCAP Flow Aggregation:** Parses raw `.pcap` / `.pcapng` packet captures using Scapy, extracting bidirectional 5-tuple flow statistics with full schema compatibility checks.
-- **Advanced Research Workbench:**
-  - *Experiment A*: Cross-Dataset Domain Generalization (CIC-IDS2017 $\leftrightarrow$ UNSW-NB15) revealing a $67.2\%$ covariate shift drop.
-  - *Experiment B*: Unseen Zero-Day Attack Discovery where unsupervised Isolation Forest detected $66.7\%$ of novel DoS attacks missed by supervised models.
-  - *Experiment C*: Network Traffic Drift Simulation quantifying degradation under volumetric spikes, TCP flag mutations, and jitter.
-- **Explainable AI (XAI):** Global Tree MDI / Permutation feature importances, local $z$-score feature deviation waterfalls, and automated plain-English SOC analyst narratives.
-- **Cyberpunk Operations Center UI:** 8-view Streamlit application featuring dark navy aesthetics, interactive Plotly confusion matrices, ROC/PR curves, and live flow scoring.
+> **NetSentry AI** is an academic research and engineering platform exploring machine learning for network intrusion detection (NIDS). Developed by a third-year B.Tech Information Science and Engineering student at NMAM Institute of Technology, Nitte, NetSentry AI bridges **Data Communication & Networking (DCN)** flow telemetry with **Machine Learning (ML)** engineering. It provides offline PCAP packet ingestion, leakage-free model pipelines, cross-dataset generalization experiments, physical robustness stress-testing, and an interactive Streamlit Security Operations Center (SOC) dashboard.
 
 ---
 
-## 📊 Benchmark Summary on Authentic Data
+## 📌 Problem Statement & Why NIDS Matters
 
-### Binary Intrusion Detection (CIC-IDS2017 Stratified Sample, 5,000 flows):
-| Algorithm | Macro-F1 | Accuracy | False Positive Rate (FPR) | False Negative Rate (FNR) | Latency (ms/flow) | Model Footprint |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **LightGBM** | **0.9892** | **98.96%** | **0.0159** (1.59%) | **0.0000** (0.0%) | 0.013 ms | 512 KB |
-| **XGBoost** | 0.9867 | 98.72% | 0.0219 (2.19%) | 0.0000 (0.0%) | 0.009 ms | 480 KB |
-| **HistGradientBoosting** | 0.9850 | 98.56% | 0.0239 (2.39%) | 0.0000 (0.0%) | 0.013 ms | 1,147 KB |
-| **Decision Tree** | 0.9808 | 98.16% | 0.0279 (2.79%) | 0.0024 (0.2%) | **0.004 ms** | **18 KB** |
-| **Random Forest** | 0.9767 | 97.76% | 0.0259 (2.59%) | 0.0167 (1.7%) | 0.122 ms | 1,943 KB |
-| **Extra Trees** | 0.9565 | 95.84% | 0.0657 (6.57%) | 0.0000 (0.0%) | 0.117 ms | 1,780 KB |
-| **K-Nearest Neighbors** | 0.9277 | 93.12% | 0.1135 (11.35%) | 0.0000 (0.0%) | 0.020 ms | 1,200 KB |
-| **MLP Neural Network** | 0.8956 | 90.08% | 0.1554 (15.54%) | 0.0000 (0.0%) | 0.007 ms | 126 KB |
-| **Support Vector Machine** | 0.8924 | 89.84% | 0.1753 (17.53%) | 0.0000 (0.0%) | 0.014 ms | 15 KB |
-| **Logistic Regression** | 0.8886 | 89.28% | 0.1295 (12.95%) | 0.0714 (7.1%) | 0.005 ms | 12 KB |
-| **Isolation Forest** (Unsupervised) | 0.3808 | 42.96% | 0.1155 (11.55%) | 0.8714 (87.1%) | 0.036 ms | 851 KB |
+Modern enterprise networks process tens of gigabits per second. Network intrusion detection systems face three fundamental engineering and data science challenges:
+1. **Payload Encryption:** Over 85% of web and enterprise traffic uses TLS 1.3 or HTTPS. Deep Packet Inspection (DPI) of payload contents is computationally prohibitive and blocked by end-to-end encryption. Modern detectors must evaluate statistical **L3/L4 bidirectional flow metadata** (durations, packet sizes, inter-arrival times, TCP flags) without payload decryption.
+2. **The Base-Rate Fallacy & Alert Fatigue:** In production, malicious flows represent $< 0.1\%$ of all packets. A model with an apparently stellar 99% accuracy and 1.5% False Positive Rate produces **over 94% false alarms** in live deployment, overwhelming SOC analysts.
+3. **Dataset Drift & Measurement Noise:** Academic benchmarks often fail to generalize to live networks due to differing testbed configurations (concept inversion) and extreme sensitivity to physical network timing jitter.
+
+NetSentry AI was built to investigate these challenges empirically, measure where models break, and enforce rigorous data isolation and safe failure behaviors.
 
 ---
 
-## 🛠️ Quick Start (Windows PowerShell / VS Code)
+## 🏗️ System Architecture
 
-### 1. Environment Setup
-```powershell
-# Set execution policy if script activation is restricted:
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+The following Mermaid diagram illustrates the end-to-end data processing, feature engineering, inference, and explainability architecture implemented in the repository:
 
-# Create and activate virtual environment
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+```mermaid
+graph TD
+    subgraph DataIngestion ["1. Data Ingestion & Flow Aggregation"]
+        PCAP["Raw PCAP / PCAPNG<br/>(Scapy PcapReader)"] -->|"5-Tuple Bidirectional<br/>Aggregation & 120s Timeout"| FlowExt["src/netsentry/pcap/flow_extractor.py"]
+        CSV["Raw Flow CSVs<br/>(Curated / User Upload)"] --> FlowExt
+        FlowExt --> CanonicalDF["Canonical 8-Feature Schema<br/>(duration_ms, fwd/bwd pkts, rates, flags, avg_size)"]
+    end
 
-# Upgrade pip and install NetSentry in editable mode
-python -m pip install --upgrade pip
-pip install -e .
-pip install -r requirements.txt
-```
+    subgraph PreprocessingPipeline ["2. Preprocessing & Leakage Guardrails"]
+        CanonicalDF --> LeakGuard["Leakage Detector<br/>(detect_target_leakage)"]
+        LeakGuard --> Dedup["Deduplication Policy<br/>(drop_duplicates)"]
+        Dedup --> SkPipeline["sklearn.pipeline.Pipeline<br/>(SimpleImputer + StandardScaler)"]
+    end
 
-### 2. Run All 22 Automated Verification Tests
-```powershell
-python -m unittest discover -s tests -v
-```
-*(Executes 22 automated unit and integration tests across data validation, model factory, evaluation metrics, explainability, PCAP ingestion, research experiments, UI compilation, and predictions in under 6 seconds).*
+    subgraph ModelInference ["3. Multi-Paradigm Detection Engine"]
+        SkPipeline -->|"Supervised Scoring"| ChampionModel["Champion Model (LightGBM)<br/>Macro-F1: 0.9892 | Latency: 0.016 ms"]
+        SkPipeline -->|"Baseline Ensembles"| MultiModels["Random Forest, Extra Trees,<br/>Decision Tree, Linear SVC, MLP"]
+        SkPipeline -->|"Unsupervised Scoring"| IsoForest["Isolation Forest<br/>Novel Attack Geometric Outlier Detection"]
+    end
 
-### 3. Launch the Operations Center Web Interface
-```powershell
-streamlit run app/main.py
-```
-*(Launches the interactive research and operations dashboard at `http://localhost:8501`).*
+    subgraph ReliabilityQuarantine ["4. Security & Operational Safe Failure"]
+        ChampionModel --> SafetyCheck["Predict Safety Policy<br/>(src/netsentry/predict.py)"]
+        IsoForest --> SafetyCheck
+        SafetyCheck -->|"Clean Valid Telemetry"| ScoredFlows["Scored Telemetry<br/>(Risk: CRITICAL, HIGH, LOW)"]
+        SafetyCheck -->|"+Inf / -Inf from 0-duration"| QuarantineNonFinite["QUARANTINE_NON_FINITE<br/>(Flagged: prediction = -1)"]
+        SafetyCheck -->|">80% Missing Features"| QuarantineCorrupt["UNPARSEABLE_ANOMALY<br/>(Flagged: prediction = -1)"]
+    end
 
----
-
-## 🔬 CLI Training & Research Commands
-
-### A. Quick Baseline Demo Run
-```powershell
-python -m netsentry.train --demo --fast
-```
-
-### B. Train Specific Algorithms with Cross-Validation
-```powershell
-python -m netsentry.train --demo --models lightgbm xgboost random_forest_500 decision_tree --fast
-```
-
-### C. Train on Authentic CIC-IDS2017 Dataset
-```powershell
-python -m netsentry.train --data data\sample\cicids2017_sample.csv --label-column Label --positive-label DoS --fast --artifacts-dir artifacts\cic_run
-```
-
-### D. Score New Flows (Live Flow Inference)
-```powershell
-python -m netsentry.predict --data data\sample\demo_flows.csv --model artifacts\best_model.joblib --features artifacts\feature_names.json --output artifacts\predictions.csv --threshold 0.50
-```
-
-### E. Run Full Multi-Model & Research Benchmark Suite
-```powershell
-python artifacts\run_full_phase3_benchmark.py
+    subgraph PresentationExplainability ["5. Explainability & Operations Center"]
+        ScoredFlows --> Explainer["Local Explainer<br/>(Z-Score Deviation vs Normal)"]
+        Explainer --> Narrative["Security Narrative Generator<br/>(Plain-English SOC Alerts)"]
+        Narrative --> StreamlitUI["Cyberpunk Streamlit Dashboard<br/>(8 Specialized Operational Views)"]
+        StreamlitUI --> PrivacyExport["Privacy-Preserving Export<br/>(IPv4/IPv6 Host Redaction: 192.168.1.***)"]
+    end
 ```
 
 ---
 
-## 📁 Repository Directory Structure
+## 💻 Technology Stack & Directory Structure
+
+- **Languages & Frameworks:** Python 3.12, Streamlit, HTML5/CSS3 (Cyberpunk custom dark design)
+- **Machine Learning & Data:** scikit-learn, LightGBM, XGBoost, pandas, NumPy
+- **Networking & Packet Inspection:** Scapy (offline PCAP streaming iterator)
+- **Explainability & Visualization:** SHAP, Plotly, custom forensic deviation waterfall renderers
+- **Testing & Quality Assurance:** Python `unittest` (63 automated tests, 100% passing)
 
 ```
 netsentry-ai/
 ├── app/                              # Streamlit Executive Research Web UI
 │   ├── main.py                       # Main application entrypoint
 │   ├── styles.py                     # Cyberpunk dark navy CSS & custom KPI widgets
-│   └── views/                        # 8 Modular UI views
-│       ├── overview.py               # Operations Center & Threat Telemetry KPIs
-│       ├── explorer.py               # Dataset Explorer, schemas, & DCN glossary
-│       ├── model_lab.py              # Interactive 11-model training & tuning
-│       ├── evaluation.py             # Confusion matrices, ROC/PR, & threshold sweep
-│       ├── traffic_analyzer.py       # Live flow scoring, PCAP ingestion, & SOC diagnosis
-│       ├── explainability.py         # Global MDI/permutation & local z-score XAI
-│       ├── research.py               # Cross-dataset, zero-day anomaly, & drift workbench
-│       └── learn.py                  # DCN + ML curriculum (Packets, TCP, Accuracy Trap)
-├── data/
-│   ├── sample/                       # Curated authentic benchmark datasets
-│   │   ├── cicids2017_sample.csv     # Genuine CIC-IDS2017 sample (5,000 flows)
-│   │   ├── unsw_nb15_sample.csv      # Genuine UNSW-NB15 sample (5,000 flows)
-│   │   ├── demo_flows.csv            # Synthetic flow baseline
-│   │   └── test_traffic.pcap         # Sample 8-packet PCAP for flow extraction
-│   └── real/                         # User-provided captures (Git-ignored)
-├── docs/                             # Complete Academic & Engineering Documentation
-│   ├── technical_architecture.md     # In-depth DCN + ML architecture specification
-│   ├── beginner_guide.md             # Student-friendly guide & 10 interview Q&As
-│   ├── dataset_provenance.md         # SHA-256 hashes, source URLs, and schemas
-│   ├── model_comparison_report.md    # 11-algorithm benchmark across latency & size
-│   ├── scientific_evaluation_report.md # Metrics, alert fatigue, and threshold tuning
-│   ├── cross_dataset_generalization_report.md # Domain shift results (CIC <-> UNSW)
-│   ├── limitations_and_future_work.md# Line-rate 10Gbps boundaries and eBPF roadmap
-│   ├── research_paper_outline.md     # Academic research paper with genuine findings
-│   └── resume_bullet_points.md       # 3 verified, metrics-driven resume bullets
-├── src/netsentry/                    # Core Python Package
-│   ├── data/                         # Loading, schema detection, partitioning
-│   ├── models/                       # Model factory (11 algorithms + param grids)
-│   ├── training/                     # Leakage-free training, CV, tuning, tracking
-│   ├── evaluation/                   # Scientific metrics & majority Zero-R baseline
-│   ├── explainability/               # Feature importance & plain-English narratives
-│   ├── research/                     # Cross-dataset, zero-day anomaly, drift
-│   ├── pcap/                         # 5-tuple bidirectional PCAP flow aggregator
-│   ├── data.py                       # Backward-compatible data wrapper
-│   ├── train.py                      # Enhanced CLI training runner
-│   └── predict.py                    # Enhanced CLI flow scoring engine
-├── tests/                            # Automated 22-Test Suite
-│   ├── test_data.py                  # Tests data validation & partitioning
-│   ├── test_models.py                # Tests model factory & pipeline fitting
-│   ├── test_evaluation.py            # Tests metrics, baseline, & thresholding
-│   ├── test_explainability.py        # Tests feature importance & narratives
-│   ├── test_research.py              # Tests cross-dataset, anomaly, & drift
-│   ├── test_predict.py               # Tests inference scoring & risk tiers
-│   ├── test_pcap.py                  # Tests bidirectional PCAP flow extraction
-│   └── test_ui.py                    # Tests compilation of all 8 Streamlit views
-├── artifacts/                        # Serialized models, metrics, and comparisons
-│   ├── full_benchmark_results.json   # Authentic Phase 3-5 benchmark results
-│   └── best_model.joblib             # Active champion model pipeline
-├── requirements.txt                  # Python dependencies
-└── pyproject.toml                    # Package metadata & build specifications
+│   └── views/                        # 8 Modular operational view interfaces
+│       ├── overview.py               # Platform KPIs, engine status, baseline comparison
+│       ├── model_lab.py              # Interactive training workbench (11 algorithms)
+│       ├── traffic_analyzer.py       # Live flow scoring, offline PCAP parsing, IP privacy export
+│       ├── explorer.py               # Exploratory data analysis, 5-tuples, schema audit
+│       ├── research.py               # Cross-dataset generalization, unseen attacks, drift
+│       ├── evaluation.py             # Confusion matrices, ROC/PR curves, threshold tuning
+│       ├── explainability.py         # Global Tree MDI / SHAP, local z-score explanations
+│       └── robustness.py             # Empirical stress testing & perturbation reporting
+├── src/netsentry/                    # Core Python production package
+│   ├── data/                         # Data loading, leakage prevention, scientific splitting
+│   ├── models/                       # Pipeline constructors across 6 algorithmic families
+│   ├── training/                     # Validation-based decision threshold calibration
+│   ├── evaluation/                   # Macro-F1, FPR, FNR, latency, and footprint metrics
+│   ├── explainability/               # Local z-score attributions & plain-English narratives
+│   ├── pcap/                         # Offline PCAP parsing & bidirectional flow extraction
+│   ├── research/                     # Cross-dataset transfer, drift, and robustness tests
+│   ├── predict.py                    # Inference engine with safe failure quarantine policy
+│   └── utils/logging.py              # Structured logging, IP masking, credential scrubbing
+├── data/sample/                      # Curated benchmark samples (CIC-IDS2017, UNSW-NB15, demo)
+├── tests/                            # 63 automated unit, integration, and security tests
+├── artifacts/                        # Serialized models, experiment outputs, and audit JSONs
+└── docs/                             # Comprehensive research reports, guides, and runbooks
 ```
 
 ---
 
-## 📚 Complete Documentation Suite
+## ⚙️ Installation & Startup Instructions
 
-1. [Technical Architecture Specification](docs/technical_architecture.md)
-2. [Beginner Guide & Interview Defense Q&A](docs/beginner_guide.md)
-3. [Dataset Provenance, Schemas & Checksums](docs/dataset_provenance.md)
-4. [Model Comparison & Benchmark Report](docs/model_comparison_report.md)
-5. [Scientific Evaluation & Alert Fatigue Report](docs/scientific_evaluation_report.md)
-6. [Cross-Dataset Generalization & Domain Shift](docs/cross_dataset_generalization_report.md)
-7. [Limitations & Future Work](docs/limitations_and_future_work.md)
-8. [Academic Research Paper Outline](docs/research_paper_outline.md)
-9. [Resume Bullet Points & Oral Defense Guide](docs/resume_bullet_points.md)
-10. [Troubleshooting Guide](docs/troubleshooting.md)
+### 1. Prerequisites & Virtual Environment Setup (Windows PowerShell)
+```powershell
+# Set execution policy if script activation is restricted:
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+# Clone repository and create Python 3.12 virtual environment:
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# Upgrade packaging tools and install in editable mode:
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 2. Verify Complete Test Suite (63 Tests)
+Run all unit, integration, and security tests:
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+*Expected result: `Ran 63 tests in ~15.6s ... OK`.*
+
+### 3. Launch the SOC Dashboard
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app/main.py
+```
+Open your browser to `http://localhost:8501`.
 
 ---
 
-## ⚖️ Ethical Notice & Security Guidelines
+## 🚀 Running Analysis & Packet Ingestion
 
-NetSentry AI is designed strictly for authorized security research, educational demonstrations, and defense. Never inspect or monitor network traffic from devices or networks without explicit, documented authorization.
+### A. Real-Time CSV Flow Scoring (CLI)
+Score incoming network flow records using the saved champion model:
+```powershell
+python -m netsentry.predict --data data/sample/demo_flows.csv --model artifacts/best_model.joblib --features artifacts/feature_names.json --output artifacts/predictions.csv --threshold 0.50
+```
+
+### B. Offline Packet Capture (PCAP) Ingestion
+In the Streamlit UI (**Traffic Analyzer** tab) or via Python API:
+```python
+from netsentry.pcap.flow_extractor import extract_flows_from_pcap
+
+# Ingest raw PCAP file and aggregate into 5-tuple bidirectional flows
+result = extract_flows_from_pcap("data/sample/test_traffic.pcap")
+print(f"Read {result.total_packets_read} packets -> Extracted {result.total_flows_extracted} flows.")
+df_flows = result.flow_dataframe
+```
+
+---
+
+## 📊 Key Research Findings & Benchmarks
+
+All metrics below are independently traced to serialized experiment outputs in `artifacts/`:
+
+### 1. Model Hierarchy on Clean Holdout Split (CIC-IDS2017 Stratified Sample, 5,000 flows)
+*Source: `artifacts/phase6_experiment_results.json`*
+
+| Algorithm | Paradigm | Macro-F1 | Accuracy | FPR | Malicious Recall | Latency | Disk Footprint |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **LightGBM (Champion)** | Boosting Ensemble | **0.9892** | **98.96%** | **1.59%** | **99.33%** | 0.016 ms | 344 KB |
+| **Random Forest (500 trees)** | Bagging Ensemble | **0.9767** | **97.76%** | **2.59%** | **97.99%** | 0.188 ms | 1,508 KB |
+| **Decision Tree (CART)** | Single Rule Tree | **0.9808** | **98.16%** | **2.79%** | **98.80%** | **0.005 ms** | **15 KB** |
+| **Logistic Regression** | Linear Boundary | **0.8886** | **89.28%** | **12.95%** | **90.78%** | 0.004 ms | 6 KB |
+| **Isolation Forest** | Unsupervised Anomaly| 0.3808 | 42.96% | 11.55% | 12.86% | 0.036 ms | 851 KB |
+
+### 2. Cross-Dataset Generalization & Concept Inversion
+*Source: `artifacts/phase6_experiment_results.json` (`part3_generalization_strategies`)*
+- **The Collapse:** Training on CIC-IDS2017 and evaluating on untouched UNSW-NB15 holdouts drops Macro-F1 from **0.9488 to 0.3148** (a 66.82% degradation).
+- **The Cause (Concept Inversion):** Attack flows in CIC-IDS2017 are long-duration volumetric DoS floods, whereas in UNSW-NB15 they are sub-second automated exploit bursts. Decision trees heavily rely on duration, misclassifying target attacks as normal traffic.
+- **The Resolution (Joint Multi-Domain Training):** Training on mixed source partitions from both domains exposes the classifier to diverse backgrounds, elevating cross-domain holdout Macro-F1 to **0.8932** (+0.5784 gain).
+
+### 3. Empirical Robustness Stress Testing
+*Source: `artifacts/phase7_robustness_results.json`*
+- **Measurement Jitter Brittleness:** Adding $\pm 5\%$ Gaussian noise to timing features collapses LightGBM Macro-F1 from **0.9892 to 0.6617**, flipping **33.12% of predictions** (405 attacks flipped to benign). Tree orthogonal hyperplanes tightly fit deterministic scripted attack intervals; small noise pushes samples across the decision boundary.
+- **Enterprise Jumbo Frames (MTU 9000):** Scaling packet lengths to 8,960 bytes drops F1 to **0.6639** (33.28% flips), as attack signatures are masked by large segment sizes.
+- **100 Gbps Burst Stability:** Rate scaling preserves **0.9850 F1** due to monotonic tree threshold saturation.
+- **Adversarial Pacing:** Dilating duration 10x drops transmission rate and enables 4 attacks to evade LightGBM and 27 attacks to evade Random Forest.
+
+---
+
+## 📸 Application Screenshots
+
+To capture genuine screenshots of the running dashboard:
+1. Launch the dashboard: `streamlit run app/main.py`.
+2. Capture the **Overview**, **Dataset Explorer**, **Traffic Analyzer**, **Research Hub**, and **Robustness** tabs using Windows Snipping Tool (`Win + Shift + S`).
+3. Store PNG captures in `docs/screenshots/` (e.g. `overview_dashboard.png`, `traffic_analyzer_pcap.png`).
+4. Automated verification ensures all views render without missing script context warnings.
+
+---
+
+## ⚠️ Scientific Limitations & Scope
+
+To ensure intellectual honesty:
+1. **Academic Research Prototype:** NetSentry AI is a research and educational platform, not an inline hardware firewall. It does not perform wire-speed kernel packet filtering.
+2. **PCAP Flow Scope:** Offline PCAP ingestion aggregates the **8-feature canonical schema**. It is a functional flow ingestion demonstration, *not* an evaluation of the full 77-feature CICFlowMeter research dataset.
+3. **Encrypted Payload Blindness:** Operates exclusively on L3/L4 metadata. It cannot inspect encrypted payloads (e.g. malicious HTTPS POST bodies) unless the attack causes volumetric or timing anomalies.
+4. **Subsampled Repository Data:** Includes 5,000-row stratified subsamples to keep the repository lightweight. Full reproduction on 2.8M rows requires downloading external UNB datasets.
+
+---
+
+## 📜 Ethical & Responsible Use Statement
+
+NetSentry AI was developed for defensive cybersecurity research, educational demonstration, and academic evaluation. 
+- Only capture and analyze packet telemetry from networks you own or have explicit written authorization to monitor.
+- The project implements IP privacy masking (`192.168.1.***`), secret credential scrubbing, and local temporary file deletion to protect privacy.
+
+---
+
+## 📚 Documentation & Reference Guides
+
+- [Phase 9 Research & Security Audit Report](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/docs/PHASE9_RESEARCH_AUDIT.md) — Comprehensive evidence-based audit.
+- [Reproducibility & Replication Guide](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/docs/REPRODUCIBILITY_GUIDE.md) — Exact reproduction commands, environments, and seeds.
+- [Metrics Inventory & Scientific Limitations](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/docs/METRICS_AND_LIMITATIONS.md) — Detailed failure analysis and metric provenance.
+- [Interview & Viva Demo Runbook](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/docs/DEMO_RUNBOOK.md) — 5-minute technical demo script and troubleshooting guide.
+- [Technical Interview Handbook](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/docs/TECHNICAL_INTERVIEW_HANDBOOK.md) — Deep-dive interview questions across ML, DCN, SWE, and Research Defense.
+- [Viva & Mock Interview Pack](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/docs/VIVA_AND_MOCK_INTERVIEW.md) — 75 project-specific viva questions and answer keys.
+- [Portfolio Case Study](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/docs/PORTFOLIO_CASE_STUDY.md) — System engineering case study for student portfolio.
+- [Resume Project Entries](file:///c:/Users/ASUS/Documents/Codex/2026-10-25/referenced-chatgpt-conversation-this-is-an/outputs/netsentry-ai/docs/RESUME_PROJECT_ENTRY.md) — 2-bullet, 3-bullet, and LinkedIn project descriptions.
