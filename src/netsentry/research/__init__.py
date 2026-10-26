@@ -27,6 +27,16 @@ from .drift import (
     simulate_model_drift,
     DriftSimulationResult,
 )
+from .robustness import (
+    PerturbationResult,
+    RobustnessSuiteResult,
+    evaluate_single_perturbation,
+    apply_gaussian_measurement_noise,
+    apply_missing_feature_injection,
+    apply_extreme_valid_stress,
+    apply_adversarial_pacing,
+    run_robustness_evaluation_suite,
+)
 
 __all__ = [
     "evaluate_cross_dataset",
@@ -47,6 +57,15 @@ __all__ = [
     "run_generalization_strategy_experiments",
     "simulate_model_drift",
     "DriftSimulationResult",
+    "PerturbationResult",
+    "RobustnessSuiteResult",
+    "evaluate_single_perturbation",
+    "apply_gaussian_measurement_noise",
+    "apply_missing_feature_injection",
+    "apply_extreme_valid_stress",
+    "apply_adversarial_pacing",
+    "run_robustness_evaluation_suite",
 ]
+
 
 

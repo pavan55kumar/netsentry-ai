@@ -63,6 +63,7 @@ def render_traffic_analyzer_view():
         pcap_option = st.radio("PCAP Source", ["Included Sample Capture (data/sample/test_traffic.pcap)", "Upload Custom .pcap/.pcapng File"], horizontal=True)
         
         target_pcap_path = None
+        is_temporary_file = False
         if "Included" in pcap_option:
             pcap_file = Path("data/sample/test_traffic.pcap")
             if pcap_file.is_file():
@@ -72,10 +73,18 @@ def render_traffic_analyzer_view():
         else:
             pcap_upload = st.file_uploader("Upload raw packet capture", type=["pcap", "pcapng"], key="pcap_uploader")
             if pcap_upload is not None:
+                # Enforce 50 MB upload limit to prevent memory exhaustion
+                if pcap_upload.size > 50 * 1024 * 1024:
+                    st.error("⚠️ Uploaded PCAP exceeds maximum safe limit of 50 MB.")
+                    return
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pcap")
-                tmp.write(pcap_upload.read())
-                tmp.flush()
+                try:
+                    tmp.write(pcap_upload.read())
+                    tmp.flush()
+                finally:
+                    tmp.close()
                 target_pcap_path = Path(tmp.name)
+                is_temporary_file = True
 
         if target_pcap_path is not None:
             with st.spinner("Parsing raw packets and reconstructing bidirectional 5-tuple flows..."):
@@ -90,19 +99,36 @@ def render_traffic_analyzer_view():
                 except Exception as ex:
                     st.error(f"Error parsing PCAP capture: {ex}")
                     return
+                finally:
+                    # Privacy & hygiene: securely delete uploaded packet captures immediately after parsing
+                    if is_temporary_file and target_pcap_path.is_file():
+                        try:
+                            target_pcap_path.unlink()
+                        except Exception:
+                            pass
 
     elif "Upload" in traffic_source:
         uploaded = st.file_uploader("Upload CSV containing flow records", type=["csv"], key="analyzer_upload")
         if uploaded is not None:
-            input_df = pd.read_csv(uploaded, low_memory=False)
-            input_df.columns = [str(c).strip() for c in input_df.columns]
+            if uploaded.size > 50 * 1024 * 1024:
+                st.error("⚠️ Uploaded CSV exceeds maximum safe limit of 50 MB.")
+                return
+            try:
+                input_df = pd.read_csv(uploaded, low_memory=False)
+                input_df.columns = [str(c).strip() for c in input_df.columns]
+                if len(input_df) == 0:
+                    st.warning("⚠️ Uploaded CSV is empty (0 data rows).")
+                    return
+            except Exception as e:
+                st.error(f"Failed to read CSV: {e}")
+                return
     else:
         sample_path = Path("data/sample/demo_flows.csv")
         if sample_path.is_file():
             input_df = pd.read_csv(sample_path, low_memory=False)
             input_df.columns = [str(c).strip() for c in input_df.columns]
 
-    if input_df is None:
+    if input_df is None or len(input_df) == 0:
         st.info("Awaiting flow data for analysis.")
         return
 

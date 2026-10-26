@@ -223,6 +223,17 @@ We systematically tested seven hypotheses to overcome domain collapse:
 ### Q10: "What is the single most important limitation of this project?"
 > **Answer:** "NetSentry AI inspects **flow metadata rather than application-layer payloads**. While this preserves user privacy and operates over encrypted TLS 1.3 traffic, it is fundamentally blind to application exploits—such as SQL injection, Log4Shell, or malicious file downloads—which produce flow packet counts and byte sizes indistinguishable from legitimate HTTP requests."
 
+### Q11: "How do you protect your intrusion detection pipeline from malicious or corrupted inputs, and why is safe failure so critical in cybersecurity?"
+> **Answer:** "In Phase 7, we eliminated the **Silent Benign Fallacy**. Standard ML pipelines convert unparseable strings to `NaN` and then use an imputer to fill missing values with training medians, which inadvertently fabricates a fake normal flow and reports attacks as benign! In NetSentry AI, we implemented a **Safe Failure Architecture**:
+1. Infinite rates ($+/\!-\infty$ from zero-duration division) are sanitized before model prediction.
+2. Missing features are verified against schema expectations (`SchemaMismatchError`).
+3. If a flow has severe missingness (>80% corrupted features), it is quarantined with `prediction = -1` and `risk_level = 'UNPARSEABLE_ANOMALY'`, ensuring it triggers analyst review rather than masquerading as clean traffic.
+4. For privacy, operational logs redact IPv4 host octets (`192.168.1.***`), passwords, and bearer tokens."
+
+### Q12: "How robust are gradient-boosted tree ensembles to real-world network perturbations like NIC clock jitter or sensor packet drops?"
+> **Answer:** "In our controlled Phase 7 robustness experiments, we discovered a vital divergence between missing telemetry and continuous noise:
+1. **Telemetry Dropout Resilience:** LightGBM maintained **0.907 F1** even when 25% of feature values were randomly dropped, because median imputation preserves distribution centroids and ensemble trees split across 77 redundant features.
+2. **Measurement Jitter Brittleness:** Adding just $\pm 5\%$ Gaussian noise to continuous timing measurements caused LightGBM's F1 to collapse from **0.989 to 0.662**, flipping **33.1% of all predictions** (with 405 malicious attacks flipped to benign!). This occurs because tree split points create sharp step-function thresholds in continuous feature space. The defense is to apply **noise-augmented training** and **logarithmic feature binning** before deployment."
 
 ---
 
@@ -239,5 +250,8 @@ When presenting NetSentry AI to an interviewer or professor, follow this exact s
 4. **Step 4: Decision Threshold Tuning (`app/views/evaluation.py`)**
    - *"In the Evaluation dashboard, we interactively drag the threshold slider from 0.50 down to 0.23, demonstrating how threshold calibration drives False Positive Rate to 0% to prevent SOC alert fatigue."*
 5. **Step 5: Live Flow Scoring & PCAP Ingestion (`app/views/traffic_analyzer.py`)**
-   - *"Finally, in the Traffic Analyzer, we upload an offline PCAP file (`test_traffic.pcap`). The engine aggregates raw packets into bidirectional 5-tuple flows, verifies schema compatibility, scores each connection, and generates plain-English SOC analyst recommendations."*
+   - *"In the Traffic Analyzer, we upload an offline PCAP file (`test_traffic.pcap`). The engine aggregates raw packets into bidirectional 5-tuple flows, verifies schema compatibility, scores each connection, and generates plain-English SOC analyst recommendations."*
+6. **Step 6: Security Engineering & Robustness (`artifacts/run_phase7_robustness_experiments.py`)**
+   - *"Finally, we highlight Phase 7 security engineering: our Safe Failure architecture isolates corrupted records as `UNPARSEABLE_ANOMALY` rather than silently passing them as benign, and our robustness harness tests against NIC clock jitter and sensor dropout."*
+
 

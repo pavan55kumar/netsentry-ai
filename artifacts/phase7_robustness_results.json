@@ -1,0 +1,319 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-26T07:05:58Z",
+    "evaluation_duration_seconds": 4.58,
+    "dataset": "CIC-IDS2017 Sample",
+    "total_test_samples": 1250,
+    "feature_count": 77
+  },
+  "lightgbm_champion": {
+    "timestamp": "2026-10-26T07:05:55.528075+00:00",
+    "model_name": "LightGBM Champion",
+    "total_test_samples": 1250,
+    "resilience_score": 44.5,
+    "perturbation_results": [
+      {
+        "test_name": "Measurement Jitter (5%)",
+        "category": "measurement_noise",
+        "description": "Simulates +/- 5% hardware NIC timestamp and counter clock drift.",
+        "original_macro_f1": 0.9892,
+        "perturbed_macro_f1": 0.6617,
+        "f1_delta": -0.3274,
+        "flip_rate_pct": 33.12,
+        "original_fpr": 0.0159,
+        "perturbed_fpr": 0.0239,
+        "fpr_delta": 0.008,
+        "mean_score_delta": 0.3178,
+        "total_samples": 1250,
+        "num_flipped": 414,
+        "details": {
+          "malicious_to_benign_flips": 405,
+          "benign_to_malicious_flips": 9
+        }
+      },
+      {
+        "test_name": "High Measurement Jitter (15%)",
+        "category": "measurement_noise",
+        "description": "Simulates extreme +/- 15% packet delay variation across congested switches.",
+        "original_macro_f1": 0.9892,
+        "perturbed_macro_f1": 0.61,
+        "f1_delta": -0.3792,
+        "flip_rate_pct": 37.84,
+        "original_fpr": 0.0159,
+        "perturbed_fpr": 0.0199,
+        "fpr_delta": 0.004,
+        "mean_score_delta": 0.3707,
+        "total_samples": 1250,
+        "num_flipped": 473,
+        "details": {
+          "malicious_to_benign_flips": 465,
+          "benign_to_malicious_flips": 8
+        }
+      },
+      {
+        "test_name": "Feature Dropout (10% Missing)",
+        "category": "missing_features",
+        "description": "Simulates 10% random telemetry loss from sampled NetFlow/sFlow sensors.",
+        "original_macro_f1": 0.9892,
+        "perturbed_macro_f1": 0.9726,
+        "f1_delta": -0.0166,
+        "flip_rate_pct": 2.08,
+        "original_fpr": 0.0159,
+        "perturbed_fpr": 0.0259,
+        "fpr_delta": 0.01,
+        "mean_score_delta": 0.0314,
+        "total_samples": 1250,
+        "num_flipped": 26,
+        "details": {
+          "malicious_to_benign_flips": 18,
+          "benign_to_malicious_flips": 8
+        }
+      },
+      {
+        "test_name": "Severe Feature Dropout (25% Missing)",
+        "category": "missing_features",
+        "description": "Simulates 25% sensor packet drop or unpopulated flow meter fields.",
+        "original_macro_f1": 0.9892,
+        "perturbed_macro_f1": 0.9072,
+        "f1_delta": -0.0819,
+        "flip_rate_pct": 8.88,
+        "original_fpr": 0.0159,
+        "perturbed_fpr": 0.0299,
+        "fpr_delta": 0.0139,
+        "mean_score_delta": 0.1079,
+        "total_samples": 1250,
+        "num_flipped": 111,
+        "details": {
+          "malicious_to_benign_flips": 99,
+          "benign_to_malicious_flips": 12
+        }
+      },
+      {
+        "test_name": "Enterprise Jumbo Frames (MTU 9000)",
+        "category": "extreme_values",
+        "description": "Examines model behavior when encountering storage-network 9KB frames.",
+        "original_macro_f1": 0.9892,
+        "perturbed_macro_f1": 0.9892,
+        "f1_delta": 0.0,
+        "flip_rate_pct": 0.0,
+        "original_fpr": 0.0159,
+        "perturbed_fpr": 0.0159,
+        "fpr_delta": 0.0,
+        "mean_score_delta": 0.0,
+        "total_samples": 1250,
+        "num_flipped": 0,
+        "details": {
+          "malicious_to_benign_flips": 0,
+          "benign_to_malicious_flips": 0
+        }
+      },
+      {
+        "test_name": "100 Gbps Line-Rate Burst",
+        "category": "extreme_values",
+        "description": "Tests numerical stability under 12.5 GB/s wire-speed bursts.",
+        "original_macro_f1": 0.9892,
+        "perturbed_macro_f1": 0.9892,
+        "f1_delta": 0.0,
+        "flip_rate_pct": 0.0,
+        "original_fpr": 0.0159,
+        "perturbed_fpr": 0.0159,
+        "fpr_delta": 0.0,
+        "mean_score_delta": 0.0,
+        "total_samples": 1250,
+        "num_flipped": 0,
+        "details": {
+          "malicious_to_benign_flips": 0,
+          "benign_to_malicious_flips": 0
+        }
+      },
+      {
+        "test_name": "Adversarial Low-and-Slow Pacing",
+        "category": "rate_pacing",
+        "description": "Adversary artificially dilates flow duration 10x to suppress packet rate.",
+        "original_macro_f1": 0.9892,
+        "perturbed_macro_f1": 0.9892,
+        "f1_delta": 0.0,
+        "flip_rate_pct": 0.0,
+        "original_fpr": 0.0159,
+        "perturbed_fpr": 0.0159,
+        "fpr_delta": 0.0,
+        "mean_score_delta": 0.0,
+        "total_samples": 1250,
+        "num_flipped": 0,
+        "details": {
+          "malicious_to_benign_flips": 0,
+          "benign_to_malicious_flips": 0
+        }
+      }
+    ],
+    "vulnerabilities_found": [
+      "Model exhibits severe performance degradation under stress (max Macro-F1 drop: 0.379).",
+      "Model is brittle to 5% measurement noise (33.1% predictions flipped)."
+    ],
+    "recommendations": [
+      "Incorporate perturbed training samples (noise augmentation) during pipeline fitting.",
+      "Apply regularization or feature discretization to reduce sensitivity to small numerical fluctuations."
+    ]
+  },
+  "random_forest_comparison": {
+    "timestamp": "2026-10-26T07:05:57.791553+00:00",
+    "model_name": "Random Forest Ensemble",
+    "total_test_samples": 1250,
+    "resilience_score": 41.8,
+    "perturbation_results": [
+      {
+        "test_name": "Measurement Jitter (5%)",
+        "category": "measurement_noise",
+        "description": "Simulates +/- 5% hardware NIC timestamp and counter clock drift.",
+        "original_macro_f1": 0.9767,
+        "perturbed_macro_f1": 0.6096,
+        "f1_delta": -0.3671,
+        "flip_rate_pct": 37.6,
+        "original_fpr": 0.0259,
+        "perturbed_fpr": 0.0,
+        "fpr_delta": -0.0259,
+        "mean_score_delta": 0.3108,
+        "total_samples": 1250,
+        "num_flipped": 470,
+        "details": {
+          "malicious_to_benign_flips": 470,
+          "benign_to_malicious_flips": 0
+        }
+      },
+      {
+        "test_name": "High Measurement Jitter (15%)",
+        "category": "measurement_noise",
+        "description": "Simulates extreme +/- 15% packet delay variation across congested switches.",
+        "original_macro_f1": 0.9767,
+        "perturbed_macro_f1": 0.5867,
+        "f1_delta": -0.39,
+        "flip_rate_pct": 39.52,
+        "original_fpr": 0.0259,
+        "perturbed_fpr": 0.0,
+        "fpr_delta": -0.0259,
+        "mean_score_delta": 0.347,
+        "total_samples": 1250,
+        "num_flipped": 494,
+        "details": {
+          "malicious_to_benign_flips": 494,
+          "benign_to_malicious_flips": 0
+        }
+      },
+      {
+        "test_name": "Feature Dropout (10% Missing)",
+        "category": "missing_features",
+        "description": "Simulates 10% random telemetry loss from sampled NetFlow/sFlow sensors.",
+        "original_macro_f1": 0.9767,
+        "perturbed_macro_f1": 0.9678,
+        "f1_delta": -0.009,
+        "flip_rate_pct": 1.52,
+        "original_fpr": 0.0259,
+        "perturbed_fpr": 0.0179,
+        "fpr_delta": -0.008,
+        "mean_score_delta": 0.1044,
+        "total_samples": 1250,
+        "num_flipped": 19,
+        "details": {
+          "malicious_to_benign_flips": 19,
+          "benign_to_malicious_flips": 0
+        }
+      },
+      {
+        "test_name": "Severe Feature Dropout (25% Missing)",
+        "category": "missing_features",
+        "description": "Simulates 25% sensor packet drop or unpopulated flow meter fields.",
+        "original_macro_f1": 0.9767,
+        "perturbed_macro_f1": 0.8823,
+        "f1_delta": -0.0944,
+        "flip_rate_pct": 10.88,
+        "original_fpr": 0.0259,
+        "perturbed_fpr": 0.008,
+        "fpr_delta": -0.0179,
+        "mean_score_delta": 0.2215,
+        "total_samples": 1250,
+        "num_flipped": 136,
+        "details": {
+          "malicious_to_benign_flips": 136,
+          "benign_to_malicious_flips": 0
+        }
+      },
+      {
+        "test_name": "Enterprise Jumbo Frames (MTU 9000)",
+        "category": "extreme_values",
+        "description": "Examines model behavior when encountering storage-network 9KB frames.",
+        "original_macro_f1": 0.9767,
+        "perturbed_macro_f1": 0.9767,
+        "f1_delta": 0.0,
+        "flip_rate_pct": 0.0,
+        "original_fpr": 0.0259,
+        "perturbed_fpr": 0.0259,
+        "fpr_delta": 0.0,
+        "mean_score_delta": 0.0,
+        "total_samples": 1250,
+        "num_flipped": 0,
+        "details": {
+          "malicious_to_benign_flips": 0,
+          "benign_to_malicious_flips": 0
+        }
+      },
+      {
+        "test_name": "100 Gbps Line-Rate Burst",
+        "category": "extreme_values",
+        "description": "Tests numerical stability under 12.5 GB/s wire-speed bursts.",
+        "original_macro_f1": 0.9767,
+        "perturbed_macro_f1": 0.9767,
+        "f1_delta": 0.0,
+        "flip_rate_pct": 0.0,
+        "original_fpr": 0.0259,
+        "perturbed_fpr": 0.0259,
+        "fpr_delta": 0.0,
+        "mean_score_delta": 0.0,
+        "total_samples": 1250,
+        "num_flipped": 0,
+        "details": {
+          "malicious_to_benign_flips": 0,
+          "benign_to_malicious_flips": 0
+        }
+      },
+      {
+        "test_name": "Adversarial Low-and-Slow Pacing",
+        "category": "rate_pacing",
+        "description": "Adversary artificially dilates flow duration 10x to suppress packet rate.",
+        "original_macro_f1": 0.9767,
+        "perturbed_macro_f1": 0.9767,
+        "f1_delta": 0.0,
+        "flip_rate_pct": 0.0,
+        "original_fpr": 0.0259,
+        "perturbed_fpr": 0.0259,
+        "fpr_delta": 0.0,
+        "mean_score_delta": 0.0,
+        "total_samples": 1250,
+        "num_flipped": 0,
+        "details": {
+          "malicious_to_benign_flips": 0,
+          "benign_to_malicious_flips": 0
+        }
+      }
+    ],
+    "vulnerabilities_found": [
+      "Model exhibits severe performance degradation under stress (max Macro-F1 drop: 0.390).",
+      "Model is brittle to 5% measurement noise (37.6% predictions flipped)."
+    ],
+    "recommendations": [
+      "Incorporate perturbed training samples (noise augmentation) during pipeline fitting.",
+      "Apply regularization or feature discretization to reduce sensitivity to small numerical fluctuations."
+    ]
+  },
+  "safe_failure_audit": {
+    "infinite_value_sanitized": true,
+    "all_nan_isolated_as_anomaly": true,
+    "severe_corruption_isolated": true,
+    "safe_failure_status": "PASSED"
+  },
+  "unsupervised_isolation_forest": {
+    "mapping_consistent": true,
+    "total_samples": 50,
+    "flagged_anomalies": 10,
+    "normal_inliers": 40
+  }
+}
